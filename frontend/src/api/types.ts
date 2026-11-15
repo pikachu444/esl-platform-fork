@@ -2422,7 +2422,16 @@ export interface DoeRankMq {
   tria_pct: number;
   over?: ("fail" | "tria")[] | null;
 }
+/** v0.21.0 GET /doe/settings.shape_rules(esl_bead_shape_v021.md §6 — 표시용, 옛 서버면 없음) */
+export interface DoeSettingsShapeRules {
+  enabled: boolean;
+  w_partial: boolean;
+  range_guard: { enabled: boolean };
+  mesh_route: { relaxed_direct: { enabled: boolean; min_faces: number | null } };
+}
 export interface DoeSettingsOut {
+  /** v0.21.0 형상 규칙 설정 요약(표시용 — 새 스냅샷 판정은 study.inputs.shape_rules, 옛 서버면 없음) */
+  shape_rules?: DoeSettingsShapeRules | null;
   /** v0.20.0 순위 지표 설정(옛 서버면 없음) */
   rank?: DoeRankCfg | null;
   /** v0.20.0 하중 전달 설정 — 모든 모드 공통 최상위 칸(esl_load_transfer.md §13.6, 옛 서버면 없음 = select 숨김) */
