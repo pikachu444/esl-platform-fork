@@ -329,6 +329,20 @@ def test_route_of_threshold_and_legacy(tmp_path, monkeypatch, route):
         {"path": "cad", "reason": None, "n_faces": 3, "min_faces": 1500}
 
 
+def test_route_core_absent_is_legacy(tmp_path, monkeypatch):
+    """코어 esl.mesh.route 가 없으면(통합 전) 직행·순위 경고 없음 = 지금 경로 그대로(ImportError 로 작업이 죽지 않는다)."""
+    monkeypatch.setattr(stg, "_mroute", lambda: None)
+    assert _route_case(tmp_path, monkeypatch, None, shape={"schema": 1}, faces=9999, mb=0.01) is None
+    c = _C({"schema": 1})
+    monkeypatch.setattr(stg, "_shape", lambda cc: tp.resolve_shape({"schema": 1}))
+    monkeypatch.setattr(stg, "_bs", lambda cc, col: "shapes")
+    res = {"d001": {"status": "READY", "quality": {"fail_ratio": 0.9, "tria_pct": 90.0}}}
+    stg._cmp_mq_flags(c, [{"id": "d001"}], res)
+    assert "mq" not in res["d001"]
+    monkeypatch.setattr(stg, "_bs", lambda cc, col: "base")
+    assert stg._sel_mq_base(c, {"mesh": {"quality": {"fail_ratio": 0.9}}}) is None
+
+
 def test_mq_rank_flags(monkeypatch, route):
     """③ 순위 경고(§5): 품질 Fail 비율·tria 가 기준을 넘는 형상만 mq(순위 순서 그대로), best_clean_mq = 경고 없는 최상위, 기준값 경계는
     통과, 열 none·옛 스냅샷 = 표시 없음."""

@@ -1441,7 +1441,9 @@ def _route_of(c: Ctx, row: dict, ccfg: dict, mode: str) -> dict | None:
     근거). 그 밖(옛 스냅샷·mesh 형상·freeform·remesh) = None — 지금 경로 그대로. STEP 면 수는 gmsh 없이 본문 세기."""
     if _bs(c, "bs_route") == "none" or row.get("source") == "mesh" or mode not in ("auto", "cad"):
         return None
-    from esl.mesh import route as mroute
+    mroute = _mroute()
+    if mroute is None:                                  # 코어 esl.mesh.route 없음(통합 전) = 지금 경로 그대로
+        return None
     src = c.p(row["rel"])
     try:
         n_faces = mg.step_scan(src, ())["n_faces"]
@@ -2317,7 +2319,9 @@ def _cmp_mq_flags(c: Ctx, shapes: list[dict], res: dict) -> None:
     """v0.21.0 SH-22: 계획 열 bs_mq = shapes — 형상 행 mq{fail_ratio, tria_pct, over}(걸린 형상만, 순위 경고 근거 — compare.json 에 기록)."""
     if _bs(c, "bs_mq") != "shapes":
         return
-    from esl.mesh import route as mroute
+    mroute = _mroute()
+    if mroute is None:
+        return
     rq = _shape(c)["mesh_route"]["rank_quality"]
     for r in shapes:
         x = res.get(r["id"]) or {}
@@ -2604,13 +2608,23 @@ def _shape(c: Ctx) -> dict | None:
     """SH-1: 스냅샷 ``doe.shape_rules`` 해석(``transfer_plan.resolve_shape``). None = 키 없음 = v0.20.0 동작(legacy). 잘못된 블록 =
     CONFIG_INVALID. Ctx 마다 1회."""
     if not hasattr(c, "_shape_rules"):
-        c._shape_rules = tp.resolve_shape(c.D.get("shape_rules"), c.cfg)
+        d = getattr(c, "D", None)                    # D 없는 최소 Ctx(단위 시험 스텁) = 키 없음 = legacy
+        c._shape_rules = tp.resolve_shape(d.get("shape_rules") if isinstance(d, dict) else None, getattr(c, "cfg", None))
     return c._shape_rules
 
 
 def _bs(c: Ctx, col: str) -> str:
     """SH-2: 계획 표 열(bs_wpart·bs_guard·bs_route·bs_mq) 값. 새 스냅샷이 아니면 none(옛 스터디). 시나리오 이름으로 분기하지 않는다."""
     return str(_lt_plan(c)[col]) if _shape(c) is not None else "none"
+
+
+def _mroute():
+    """코어 ``esl.mesh.route``(경로 판정·품질 순위 판정 — impl-geom). 없으면 None(= 직행·순위 경고 없음, v0.20.0 동작)."""
+    try:
+        from esl.mesh import route as mroute
+    except ImportError:
+        return None
+    return mroute
 
 
 def _kwcall(fn, *args, **kw):
@@ -3567,7 +3581,9 @@ def _sel_mq_base(c: Ctx, inp: dict) -> dict | None:
     q = (inp.get("mesh") or {}).get("quality")
     if not isinstance(q, dict) or q.get("fail_ratio") is None:
         return None
-    from esl.mesh import route as mroute
+    mroute = _mroute()
+    if mroute is None:
+        return None
     fl = mroute.rank_flag(q, _shape(c)["mesh_route"]["rank_quality"])
     summ = {"fail_ratio": q["fail_ratio"], "tria_pct": q.get("tria_pct"), "warn": fl is not None}
     warning = None
