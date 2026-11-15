@@ -37,7 +37,7 @@ def TABLE(H6):
 
 @pytest.fixture(scope="module")
 def AUTO(H6):
-    mesh, g, lab, fx, _d = H6
+    mesh, g, lab, _fx, _d = H6
     sel, _sym, _w = bgr.auto_seed(g, lab, CFG)
     return bgr.normalize_v2(sel, g, CFG, labels=lab, mesh=mesh, shape_rules=RU)
 

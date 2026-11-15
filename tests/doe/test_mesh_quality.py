@@ -194,6 +194,8 @@ def test_guard_probe_v_sh_4():
     a1 = mq._area(X1, C, T.astype(np.int64))
     assert p["area_ratio_min"] == float(np.min(a1 / np.maximum(a0, 1e-300)))
     assert p["new_fail_ratio"] is None
+    ja = mq._jac_angle(X1, C, T)                       # 빠른 경로 = element_metrics 와 비트 같음
+    assert ja["jacobian"].tobytes() == m1["jacobian"].tobytes() and ja["min_angle"].tobytes() == m1["min_angle"].tobytes()
     off = mq.guard_probe(X0b, X1, C, T, idx, flip_deg=flip, jac_min=None, tria_angle_min_deg=None)
     assert off["jac_bad_new"] == 0 and off["tri_bad_new"] == 0
 

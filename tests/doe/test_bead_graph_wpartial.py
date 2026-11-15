@@ -128,7 +128,7 @@ def test_w_partial_legacy_v_sh_8(H6):
 
 
 def test_w_partial_network_ties_merge(H6):
-    mesh, g, lab, fx, _d = H6
+    mesh, g, lab, _fx, _d = H6
     sha = bgr.graph_sha_of(g)
     net = {"schema_version": 2, "graph": {"sha256": sha, "rules": g["rules"], "edits": {}},
            "beads": [{"id": "b1", "src": "graph", "segs": [{"network": 16483}]}], "ties": []}

@@ -1715,7 +1715,8 @@ def range_guard_table(mesh: dict, graph: dict, labels: dict, fixed_ids, cfg: dic
         order += [(b["id"], t, "seed") for t in vs]
         if len(ids) == 1 and not net and int(b.get("hold_fixed", 1)) == 1:
             covered[ids[0]] = set(vs)
-    singles = sorted((s for s in graph["segments"] if s["type"] != "base" and int(s["id"]) not in ex),
+    singles = sorted((s for s in graph["segments"] if s["type"] != "base" and int(s["id"]) not in ex
+                      and int(s["anchor"]) >= 0),
                      key=lambda s: (int(s["tier"]), int(s["anchor"])))
     for s in singles:
         vs = [t for t in _possible_vars(graph, [s["id"]], wp) if t not in covered.get(int(s["id"]), set())]
@@ -1811,7 +1812,8 @@ def _combo_one(P, rgm, grp, items, cc, steps, bud, combos, skipped, keyf):
         return None
     members = [keyf(n) for n in names]
     if res.get("skipped"):
-        skipped.append({"key": {"combo": members}, "reason": res["skipped"], "detail": {"n": res.get("n", len(names))}})
+        skipped.append({"key": {"combo": members}, "reason": res["skipped"],
+                        "detail": {"n": res.get("n", len(names)), "vars": names}})
         return res
     c = {"members": members, "vars": names, "corners": res["corners"], "bad_n": res["bad_n"], "scale": res["scale"],
          "reason": res["reason"], "value": res["value"], "usable": res["usable"]}
@@ -2002,11 +2004,8 @@ def guard_selection(mesh: dict, D, B, cfg: dict | None, *, only=None, clock=None
             c = _combo_one(P, rgm, grp_, items, cc, steps, bud, combos, skipped, lambda n: keyof[n])
             if c is not None and "scale" in c:
                 _apply_combo([tgt[n] for n in c["vars"]], c)
-        for s in skipped:
-            if s["reason"] == "max_group":
-                D.warnings.append({"code": "RG_COMBO_SKIPPED", "level": "info",
-                                   "vars": sorted(next((n for n, k in keyof.items() if k == m), None) or ""
-                                                  for m in s["key"]["combo"]), "n": s["detail"]["n"]})
+            elif c is not None and c.get("skipped") == "max_group":
+                D.warnings.append({"code": "RG_COMBO_SKIPPED", "level": "info", "vars": c["vars"], "n": c["n"]})
     if bud.stopped is not None:
         D.warnings.append({"code": "RG_BUDGET", "level": "info", "done": done, "total": total, "evals": bud.evals,
                            "stopped": bud.stopped})
@@ -2023,7 +2022,8 @@ def guard_info(doc: dict | None) -> list[dict]:
     out = []
     for s in doc.get("skipped") or []:
         if s.get("reason") == "max_group":
-            out.append({"code": "RG_COMBO_SKIPPED", "level": "info", "vars": [], "n": (s.get("detail") or {}).get("n")})
+            dt = s.get("detail") or {}
+            out.append({"code": "RG_COMBO_SKIPPED", "level": "info", "vars": dt.get("vars") or [], "n": dt.get("n")})
     b = doc.get("budget") or {}
     if b.get("stopped") is not None:
         n_sk = sum(1 for s in doc.get("skipped") or [] if s.get("reason") == "budget")

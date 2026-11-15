@@ -267,7 +267,7 @@ def guard_probe(x0, x, conn, elem_type, idx, *, flip_deg, jac_min, tria_angle_mi
     b0 = base if base is not None else guard_base(x0, conn, elem_type, idx)
     C, et = b0["C"], b0["et"]
     m0 = b0["m"]
-    m1 = element_metrics(x, C, et)
+    m1 = element_metrics(x, C, et) if qcfg is not None else _jac_angle(x, C, et)
     q = m1["is_quad"]
     if q.any():
         out["jac_min"] = float(m1["jacobian"][q].min())
@@ -298,4 +298,40 @@ def guard_base(x0, conn, elem_type, idx, qcfg=None) -> dict:
     out = {"C": C, "et": et, "m": m, "area": _area(x0, C, et)}
     if qcfg is not None:
         out["fail"] = _fail_mask(m, qcfg)[0]
+    return out
+
+
+def _jac_angle(x0, conn, elem_type) -> dict:
+    """``element_metrics`` 의 jacobian·min_angle·is_quad 만(같은 식·같은 연산 순서 — 값 비트 같음, guard 탐침 속도용)."""
+    X = np.asarray(x0, dtype=np.float64)
+    C = np.asarray(conn, dtype=np.int64)
+    q = np.asarray(elem_type).astype(int) == 4
+    ne = C.shape[0]
+    out = {"min_angle": np.zeros(ne), "jacobian": np.ones(ne), "is_quad": q}
+    for mask, k in ((q, 4), (~q, 3)):
+        if not mask.any():
+            continue
+        P = X[C[mask, :k]]
+        A = np.stack([_ang(np.roll(P, 1, axis=1)[:, i] - P[:, i], np.roll(P, -1, axis=1)[:, i] - P[:, i])
+                      for i in range(k)], axis=1)
+        out["min_angle"][mask] = A.min(axis=1)
+        if k == 4:
+            p0, p1, p2, p3 = (P[:, i] for i in range(4))
+            n = np.cross(p2 - p0, p3 - p1)
+            n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-300)
+            e1 = (p1 - p0) - np.einsum("ij,ij->i", p1 - p0, n)[:, None] * n
+            e1 /= np.maximum(np.linalg.norm(e1, axis=1, keepdims=True), 1e-300)
+            e2 = np.cross(n, e1)
+            R = P - P.mean(axis=1, keepdims=True)
+            xy = np.stack([np.einsum("mkj,mj->mk", R, e1), np.einsum("mkj,mj->mk", R, e2)], axis=2)
+            g = 1.0 / np.sqrt(3.0)
+            dets = []
+            for xi, eta in ((-g, -g), (g, -g), (g, g), (-g, g)):
+                dxi = 0.25 * np.array([-(1 - eta), (1 - eta), (1 + eta), -(1 + eta)])
+                deta = 0.25 * np.array([-(1 - xi), -(1 + xi), (1 + xi), (1 - xi)])
+                a = np.einsum("k,mkj->mj", dxi, xy)
+                b = np.einsum("k,mkj->mj", deta, xy)
+                dets.append(a[:, 0] * b[:, 1] - a[:, 1] * b[:, 0])
+            D = np.stack(dets, axis=1)
+            out["jacobian"][mask] = D.min(axis=1) / np.maximum(np.abs(D).max(axis=1), 1e-300)
     return out

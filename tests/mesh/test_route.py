@@ -4,14 +4,16 @@
 그리고 독립성(AST — esl.doe·gmsh import 없음, open·DEFAULTS·전역 난수 없음). 기준값은 시험 설정(DEFAULTS 해석)에서."""
 import ast
 import os
+import pathlib
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "doe"))
 
-import synth_guard as sg  # noqa: E402
-from esl.doe import DEFAULTS  # noqa: E402
-from esl.mesh import route  # noqa: E402
+import synth_guard as sg
+
+from esl.doe import DEFAULTS
+from esl.mesh import route
 
 SRC = os.path.join(HERE, "..", "..", "esl", "mesh", "route.py")
 RU = sg.rules()
@@ -62,7 +64,7 @@ def test_rank_flag_boundaries():
 
 
 def test_route_independent():
-    tree = ast.parse(open(SRC, encoding="utf-8").read())
+    tree = ast.parse(pathlib.Path(SRC).read_text(encoding="utf-8"))
     mods = set()
     for n in ast.walk(tree):
         if isinstance(n, ast.Import):
@@ -70,6 +72,6 @@ def test_route_independent():
         elif isinstance(n, ast.ImportFrom):
             mods.add(n.module or "")
     assert mods <= {"__future__", "math"}, mods
-    src = open(SRC, encoding="utf-8").read()
+    src = pathlib.Path(SRC).read_text(encoding="utf-8")
     assert "open(" not in src and "DEFAULTS" not in src and "random" not in src and "gmsh" not in src.replace(
         "gmsh 를", "")

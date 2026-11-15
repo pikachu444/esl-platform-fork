@@ -5,6 +5,7 @@ max_evals)·막힘·문서 스키마, 그리고 모듈 독립성(AST — esl.doe
 import ast
 import json
 import os
+import pathlib
 
 import numpy as np
 import pytest
@@ -70,7 +71,7 @@ def test_inward_rounding():
     assert rgm.inward(41.31257, 37.0) == 41.3125
     assert rgm.inward(29.82341, 37.0) == 29.8235
     assert rgm.inward(5.0, 6.0) == 5.0 and rgm.inward(7.0, 6.0) == 7.0
-    from esl.doe import bead_graph as bgr                  # bead_graph._inward 와 같은 식(이곳이 원본)
+    from esl.doe import bead_graph as bgr  # bead_graph._inward 와 같은 식(이곳이 원본)
     for v, n in ((41.31257, 37.0), (29.82341, 37.0), (6.123456789, 6.5), (6.98765, 6.5)):
         assert rgm.inward(v, n) == bgr._inward(v, n)
 
@@ -216,7 +217,7 @@ def test_accept_order():
 
 # ---------------------------------------------------------------- V-SH-6 independence (range_guard part)
 def _imports(path):
-    tree = ast.parse(open(path, encoding="utf-8").read())
+    tree = ast.parse(pathlib.Path(path).read_text(encoding="utf-8"))
     mods = set()
     for n in ast.walk(tree):
         if isinstance(n, ast.Import):
@@ -230,7 +231,7 @@ def test_range_guard_independent():
     tree, mods = _imports(SRC)
     assert mods <= {"__future__", "math", "time", "numpy"}, mods
     assert not any(m.startswith(("esl.doe", "beadgraph", "esl.mesh", "os", "json")) for m in mods)
-    src = open(SRC, encoding="utf-8").read()
+    src = pathlib.Path(SRC).read_text(encoding="utf-8")
     assert "open(" not in src and "DEFAULTS" not in src
     for n in ast.walk(tree):                                             # 전역 난수 없음(시드 0 default_rng 만)
         if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Attribute) and n.value.attr == "random":
