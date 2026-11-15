@@ -68,6 +68,8 @@ GRAPH_LABELS = "graph_labels.npz"
 GRAPH_BIN = "graph.bin"
 W_CLAMP_JSON = "w_clamp.json"            # Verifier fix v0.17.0 (BG-X-1): W default-range clamp computed in BD_LOADS
 W_CLAMP_SCHEMA = "esl/bg_w_clamp/1"
+RANGE_GUARD_JSON = "range_guard.json"   # v0.21.0 SH-13·18: prep/select/range_guard.json · select/<sha12>/range_guard.json
+RANGE_GUARD_SCHEMA = "esl/range_guard/1"   # = esl.morph.range_guard.SCHEMA
 GRAPH_BIN_ARRAYS = ("cls", "segment", "junction_zone", "island", "floor", "tier")
 GRAPH_ALGO = 1                          # esl graph-path basis rules (basis.json.graph_algo — BG-D-39)
 GRAPH_RULES = 1                         # graph-path design-check rules (grid_manifest.graph_rules)
@@ -262,14 +264,17 @@ def _inward(v: float, nom: float) -> float:
     return float((np.ceil(q - 1e-9) if v < nom else np.floor(q + 1e-9)) / 1e4)
 
 
-def w_clamp_table(mesh: dict, graph: dict, labels: dict, fixed_ids, cfg: dict | None) -> dict:
+def w_clamp_table(mesh: dict, graph: dict, labels: dict, fixed_ids, cfg: dict | None,
+                  shape_rules: dict | None = None) -> dict:
     """Verifier fix v0.17.0 (§12 BG-X-1): before any matrix exists, find for every W-capable graph bead candidate — each
     segment with an entry width + each auto-seed W group (channel + flare) — the non-inverting part of its default W
     range, exactly as BD_MATRIX ``range_check`` would (same basis: package ``basis`` through ``basis_v2``, ramp frozen
     at the original default range; same inversion rule ``design_state``; ``range.check_steps`` bisections). Only
-    candidates whose default range inverts get an entry. Deterministic."""
+    candidates whose default range inverts get an entry. Deterministic.
+    v0.21.0 §2.1: shape_rules 의 w_partial(range_guard 꺼짐)이면 자동 seed 후보 = S_W 가 있는 묶음(W 는 S_W 에만)."""
     from esl.doe import bead_select as bs
     sc = select_cfg(cfg)
+    wp = _w_partial(shape_rules)
     doc = {"schema": W_CLAMP_SCHEMA, "graph_sha256": graph_sha_of(graph), "cfg_sha256": _cfg_key(cfg),
            "hold": 1, "entries": []}
     steps = int(sc["range"]["check_steps"] or 0)
@@ -282,7 +287,8 @@ def w_clamp_table(mesh: dict, graph: dict, labels: dict, fixed_ids, cfg: dict | 
     sel, _sym, _aw = auto_seed(graph, labels, cfg)
     for b in sel["beads"]:
         ids, _z, net = _resolve_segs(graph, labels, b["segs"], b["id"])
-        if not net and len(ids) > 1 and all(graph["segments"][x]["entry_width"] is not None for x in ids):
+        if not net and len(ids) > 1 and (w_segs(graph, ids) if wp else
+                                         all(graph["segments"][x]["entry_width"] is not None for x in ids)):
             cands.append(sorted(ids))
     out = []
     for grp in cands:
@@ -298,7 +304,8 @@ def w_clamp_table(mesh: dict, graph: dict, labels: dict, fixed_ids, cfg: dict | 
     norm = {"schema_version": SCHEMA_VERSION, "feature_angle_deg": sc_fa, "beads": beads, "ties": [],
             "fixed_user": bs._norm_set(None, "fixed_user", 10_000_000), "exclude": bs._norm_set(None, "exclude", 10_000_000),
             "graph": {"sha256": doc["graph_sha256"], "rules": int(graph["rules"]), "edits": {}}}
-    D = derive_obj_v2(mesh, norm, cfg, graph, labels, fixed_node_ids=fixed_ids)
+    D = derive_obj_v2(mesh, norm, cfg, graph, labels, fixed_node_ids=fixed_ids,
+                      shape_rules=_no_guard(shape_rules) if wp else None)
     B = bs.basis(mesh, D, cfg)
     x0 = np.asarray(mesh["x0"], dtype=np.float64)
 
@@ -459,7 +466,19 @@ def edited_graph(graph: dict, labels: dict, edits: dict | None, mesh: dict | Non
              if isinstance(ref, dict) else ref)
 
 
-def _possible_vars(graph, seg_ids) -> list[str]:
+def w_segs(graph, seg_ids) -> list[int]:
+    """v0.21.0 SH-4: S_W = 비드 세그먼트 중 ``entry_width`` 가 있는 것(정렬)."""
+    return sorted(int(s) for s in seg_ids if graph["segments"][s]["entry_width"] is not None)
+
+
+def _w_partial(rules) -> bool:
+    """새 스냅샷 ``shape_rules.w_partial``(None = v0.20.0 규칙 — W 는 모든 세그먼트에 폭이 있을 때만)."""
+    return bool(rules) and bool(rules.get("w_partial"))
+
+
+def _possible_vars(graph, seg_ids, w_partial: bool = False) -> list[str]:
+    if w_partial:                                      # SH-4: |S_W| ≥ 1 이면 W 가능
+        return ["D", "W"] if w_segs(graph, seg_ids) else ["D"]
     ws = [graph["segments"][s]["entry_width"] for s in seg_ids]
     return ["D", "W"] if ws and all(w is not None for w in ws) else ["D"]
 
@@ -501,11 +520,14 @@ def _resolve_segs(graph, labels, segs, bid) -> tuple[list[int], list[int], bool]
 
 
 def normalize_v2(sel, graph: dict | None, cfg: dict | None = None, *, labels: dict | None = None,
-                 mesh: dict | None = None, current_sha: str | None = None) -> tuple[dict, str]:
+                 mesh: dict | None = None, current_sha: str | None = None,
+                 shape_rules: dict | None = None) -> tuple[dict, str]:
     """SelectionIn schema 2 -> (normalized, sha256). Graph beads are validated against the edited graph.
-    graph None (GRAPH_FAILED) = elems beads only (a graph bead -> BG_SEG_UNKNOWN); labels are required with a graph."""
+    graph None (GRAPH_FAILED) = elems beads only (a graph bead -> BG_SEG_UNKNOWN); labels are required with a graph.
+    shape_rules (v0.21.0 스냅샷 ``doe.shape_rules`` 해석값, None = v0.20.0): ``w_partial`` 이면 W 가능 = |S_W| ≥ 1(SH-4)."""
     from esl.doe import bead_select as bs
     sc = select_cfg(cfg)
+    wp = _w_partial(shape_rules)
     if not isinstance(sel, dict) or sel.get("schema_version") != 2:
         _bad("SELECT_SCHEMA_MISMATCH", "schema 2 선택이 아님")
     gin = sel.get("graph") or {}
@@ -564,7 +586,7 @@ def normalize_v2(sel, graph: dict | None, cfg: dict | None = None, *, labels: di
             if s in seg_owner:
                 _bad("SELECT_OVERLAP", f"세그먼트 {s} 가 {seg_owner[s]}·{bid} 에 겹침", bead=bid, elems_n=0)
             seg_owner[s] = bid
-        poss = ["D"] if net else _possible_vars(g2, ids)
+        poss = ["D"] if net else _possible_vars(g2, ids, wp)
         nb = {"id": bid, "name": name, "src": "graph", "segs": nsegs}
         vs = b.get("vars")
         if vs is not None:
@@ -606,7 +628,7 @@ def normalize_v2(sel, graph: dict | None, cfg: dict | None = None, *, labels: di
         ties.append(sorted(grp, key=lambda x: int(x[1:])))
     ties.sort(key=lambda g: int(g[0][1:]))
     if ties:
-        _check_ties(g2, l2, out_beads, ties, sc)
+        _check_ties(g2, l2, out_beads, ties, sc, wp)
     fa = sel.get("feature_angle_deg")
     fa = float(sc["feature_angle_deg"]) if fa is None else fa
     if isinstance(fa, bool) or not isinstance(fa, (int, float)) or not 1.0 <= float(fa) <= 45.0:
@@ -623,22 +645,28 @@ def normalize_v2(sel, graph: dict | None, cfg: dict | None = None, *, labels: di
     return norm, bs.selection_sha256(norm)
 
 
-def _bead_nominals(g, l, b):
+def _bead_nominals(g, l, b, w_partial: bool = False):
     ids, _z, net = _resolve_segs(g, l, b["segs"], b["id"])
     lens = np.array([float(g["segments"][s]["length"] or 1.0) for s in ids])
     D = float(np.sum(lens * np.array([float(g["segments"][s]["D"]) for s in ids])) / lens.sum())
+    if w_partial:                                      # SH-5: W_nom = S_W 길이 가중 평균 entry_width
+        sw = w_segs(g, ids)
+        if net or not sw:
+            return D, None
+        lw = np.array([float(g["segments"][s]["length"] or 1.0) for s in sw])
+        return D, float(np.sum(lw * np.array([float(g["segments"][s]["entry_width"]) for s in sw])) / lw.sum())
     ws = [g["segments"][s]["entry_width"] for s in ids]
     W = None if net or any(w is None for w in ws) else float(np.sum(lens * np.array(ws, float)) / lens.sum())
     return D, W
 
 
-def _check_ties(g, l, beads, ties, sc):
+def _check_ties(g, l, beads, ties, sc, w_partial: bool = False):
     tol = float(sc["graph"]["sym_tol_mm"])
     by = {b["id"]: b for b in beads}
     for grp in ties:
         if any(by[x]["src"] != "graph" for x in grp):
             _bad("BG_TIE_NOMINAL", "대칭 묶기는 그래프 비드만", beads=grp)
-        nom = [_bead_nominals(g, l, by[x]) for x in grp]
+        nom = [_bead_nominals(g, l, by[x], w_partial) for x in grp]
         Ds = [n[0] for n in nom]
         Ws = [n[1] for n in nom]
         if len({w is None for w in Ws}) != 1 or max(Ds) - min(Ds) > tol or \
@@ -687,6 +715,9 @@ class GraphDerived:
                          "range_default": b.range_default, "range_feasible": b.range_feasible,
                          "warnings": b.warnings, "hold_fixed": b.hold_fixed, "network": b.network,
                          "n_segments": len(b.seg_ids), "n_junction_zones": len(b.zone_ids)})
+            if getattr(b, "w_cover", None) is not None:   # v0.21.0 §3.2: W 부분일 때만
+                rows[-1]["w_segs"] = [self.graph["segments"][s]["anchor"] for s in b.w_seg_ids]
+                rows[-1]["w_cover"] = b.w_cover
         g = self.graph
         ng = self.norm.get("graph") or {"sha256": None, "edits": {}}
         doc = {"rev": rev, "sha256": self.sha256, "mesh_sha256": self.mesh_sha256, "beads": rows, "fixed": self.fixed,
@@ -721,12 +752,15 @@ def sym_pairs(graph, tol):
 
 
 def derive_v2(mesh: dict, norm: dict, cfg: dict | None, graph: dict | None, labels: dict | None, *, frame=None,
-              fixed_scan=(), bead: str | None = None, index=None, w_clamp: dict | None = None) -> dict:
+              fixed_scan=(), bead: str | None = None, index=None, w_clamp: dict | None = None,
+              range_guard: dict | None = None, shape_rules: dict | None = None) -> dict:
     """(Backend API) normalized schema 2 selection -> SelectionDerived dict: beads, fixed, warnings, graph block
     (§6.1), graph_algo, slope_suggested, islands_suggested, fixed_ab, params (DoeParamsOut rows) + param_beads.
-    ``bead`` is accepted for signature parity (the whole selection is derived — graph beads are cheap)."""
+    ``bead`` is accepted for signature parity (the whole selection is derived — graph beads are cheap).
+    v0.21.0: shape_rules(스냅샷 해석값)·range_guard(prep/select/range_guard.json) → ``derive_obj_v2``."""
     from esl.doe import bead_select as bs
-    D = derive_obj_v2(mesh, norm, cfg, graph, labels, fixed_node_ids=fixed_scan, index=index, w_clamp=w_clamp)
+    D = derive_obj_v2(mesh, norm, cfg, graph, labels, fixed_node_ids=fixed_scan, index=index, w_clamp=w_clamp,
+                      range_guard=range_guard, shape_rules=shape_rules)
     doc = D.summary(frame)
     for k in ("rev", "sha256", "mesh_sha256"):
         doc.pop(k, None)
@@ -777,7 +811,7 @@ def _seg_frame(graph: dict, b, ix):
     n = n / max(np.linalg.norm(n), 1e-300)
     e1, e2 = np.asarray(fr["e1"], float), np.asarray(fr["e2"], float)
     org = np.asarray(fr.get("origin", [0.0, 0.0]), float)
-    segs = [graph["segments"][i] for i in b.seg_ids]
+    segs = [graph["segments"][i] for i in (b.w_seg_ids if getattr(b, "w_cover", None) is not None else b.seg_ids)]
     rep = sorted(segs, key=lambda sg: (-float(sg.get("length") or 0.0), int(sg["id"])))[0]
     m = np.asarray(b.bead_mask, bool)
     fl = np.asarray(b.floor_mask, bool) if np.asarray(b.floor_mask, bool).any() else m
@@ -900,11 +934,15 @@ def param_beads(D) -> list[dict]:
 
 def derive_obj_v2(mesh: dict, norm: dict, cfg: dict | None, graph: dict | None, labels: dict | None, *,
                   fixed_node_ids=(), index=None, mesh_sha256: str | None = None,
-                  w_clamp: dict | None = None) -> GraphDerived:
-    """normalized schema 2 selection -> GraphDerived (arrays — worker basis / tests)."""
+                  w_clamp: dict | None = None, range_guard: dict | None = None,
+                  shape_rules: dict | None = None) -> GraphDerived:
+    """normalized schema 2 selection -> GraphDerived (arrays — worker basis / tests).
+    v0.21.0(새 스냅샷만): shape_rules.w_partial → W 를 S_W 에만(SH-4~9), shape_rules.range_guard 가 있으면 range_guard 표
+    (``range_guard_table``)를 맞는 변수에 적용(SH-15·16) — 맞지 않으면 guard.state unchecked + RG_UNCHECKED."""
     from esl.doe import bead_select as bs
     from esl.mesh import features
     sc = select_cfg(cfg)
+    wp = _w_partial(shape_rules)
     ix = index or bs.mesh_index(mesh)
     if graph is not None and labels is not None:
         g2, l2 = edited_graph(graph, labels, (norm.get("graph") or {}).get("edits"), mesh)
@@ -951,10 +989,17 @@ def derive_obj_v2(mesh: dict, norm: dict, cfg: dict | None, graph: dict | None, 
         gb = GraphBead(b["id"], b["name"])
         gb.seg_ids, gb.zone_ids, gb.network = ids, zones, int(g2["segments"][ids[0]]["network"])
         gb.tier = int(g2["segments"][ids[0]]["tier"])
-        gb.vars = b.get("vars") or (["D"] if net else _possible_vars(g2, ids))
+        gb.vars = b.get("vars") or (["D"] if net else _possible_vars(g2, ids, wp))
         gb.hold_fixed = int(b.get("hold_fixed", 1))
-        D, W = _bead_nominals(g2, l2, b)
+        D, W = _bead_nominals(g2, l2, b, wp)
         gb.D_nom, gb.W_nom = D, (W if "W" in gb.vars else None)
+        gb.w_seg_ids, gb.w_cover = (w_segs(g2, ids) if wp else list(ids)) if gb.W_nom is not None else [], None
+        if wp and gb.W_nom is not None and len(gb.w_seg_ids) < len(ids):   # SH-5·§3.2: W 부분 비드
+            ln = {s: float(g2["segments"][s]["length"] or 1.0) for s in ids}
+            gb.w_cover = _r(sum(ln[s] for s in gb.w_seg_ids) / sum(ln.values()))
+            gb.warnings.append({"code": "BG_W_PARTIAL", "level": "info", "bead": b["id"], "n_w": len(gb.w_seg_ids),
+                                "n_seg": len(ids), "cover": gb.w_cover,
+                                "no_w": sorted(int(g2["segments"][s]["anchor"]) for s in ids if s not in gb.w_seg_ids)})
         Ds = [float(g2["segments"][s]["D"]) for s in ids]
         if max(Ds) - min(Ds) > float(sc["graph"]["sym_tol_mm"]):
             gb.warnings.append({"code": "BG_GROUP_NOMINAL_SPREAD", "bead": b["id"], "min": _r(min(Ds)), "max": _r(max(Ds))})
@@ -991,6 +1036,9 @@ def derive_obj_v2(mesh: dict, norm: dict, cfg: dict | None, graph: dict | None, 
     D.exclude_mask = excl
     D.norm_cfg_tol = float(sc["graph"]["sym_tol_mm"])
     D.cfg1 = cfg1
+    D.shape_rules = shape_rules
+    if _guard_rules(shape_rules) is not None:          # v0.21.0 SH-14·15: 준비 표 적용(맞지 않는 변수 = unchecked)
+        apply_range_guard(D, range_guard, cfg)
     return D
 
 
@@ -1048,6 +1096,14 @@ def params_rows_v2(derived: GraphDerived, cfg: dict | None = None) -> list[dict]
                         "use_default": not any(w.get("code") == "BG_SEGMENT_SHORT" and w.get("var") ==
                                                var_name(b.id, typ) for w in b.warnings),
                         "group_members": [var_name(x, typ) for x in (grp or [b.id])]})
+            gd = (getattr(b, "guard", None) or {}).get(typ)
+            if gd is not None:                         # v0.21.0 SH-16(새 스냅샷 그래프 변수만)
+                out[-1]["guard"] = copy.deepcopy(gd)
+                if gd.get("state") == "blocked":
+                    out[-1]["use_default"] = False
+            if typ == "W" and getattr(b, "w_cover", None) is not None:
+                out[-1]["w_segs"] = [derived.graph["segments"][s]["anchor"] for s in b.w_seg_ids]
+                out[-1]["w_cover"] = b.w_cover
     out.sort(key=lambda r: r["name"])
     return out
 
@@ -1078,7 +1134,7 @@ def basis_v2(mesh: dict, derived: GraphDerived, cfg: dict | None = None):
         if b.src != "graph":
             continue
         for typ in b.vars:
-            pk_list.append({"name": var_name(b.id, typ), "kind": typ, "segs": b.seg_ids, "zones": b.zone_ids,
+            pk_list.append({"name": var_name(b.id, typ), "kind": typ, "segs": _var_segs(b, typ), "zones": b.zone_ids,
                             "hold": b.hold_fixed, "bead": b.id})
     ranges = {}
     for p in pk_list:
@@ -1110,7 +1166,8 @@ def basis_v2(mesh: dict, derived: GraphDerived, cfg: dict | None = None):
                 b0.warnings.append(ww)
         if v["info"].get("short"):
             b0.warnings.append({"code": "BG_SEGMENT_SHORT", "bead": b0.id, "var": v["name"],
-                                "length_mm": _r(sum(float(g["segments"][s]["length"] or 0.0) for s in b0.seg_ids)),
+                                "length_mm": _r(sum(float(g["segments"][s]["length"] or 0.0)
+                                                    for s in _var_segs(b0, v["kind"]))),
                                 "ramp_mm": _r(v["info"]["ramp_mm"])})
             continue
         lo, hi = ranges[v["name"]]
@@ -1149,6 +1206,13 @@ def basis_v2(mesh: dict, derived: GraphDerived, cfg: dict | None = None):
     B = bs.Basis(vars_, n, derived.sha256)
     B.graph_algo = GRAPH_ALGO
     return B
+
+
+def _var_segs(b, typ: str) -> list:
+    """기저에 넘길 세그먼트: W = S_W(SH-6 — v0.20.0 규칙에서는 S 전체와 같음), D = S."""
+    if typ == "W" and getattr(b, "w_seg_ids", None):
+        return b.w_seg_ids
+    return b.seg_ids
 
 
 def clamp_w_ranges(derived, rc_warnings: list[dict]) -> list[dict]:
@@ -1409,3 +1473,613 @@ def report_line(derived_doc: dict) -> list[str]:
             out.append(f"{b['id']} {b.get('name') or ''}: 세그먼트 {b.get('n_segments', 0)} · 접합 구역 "
                        f"{b.get('n_junction_zones', 0)} · 묶음 출처(그래프)")
     return out
+
+
+# ====================================================================== v0.21.0 range guard (esl_bead_shape_v021.md §4)
+# 판정·이분·조합·예산·진단 = 모드 무관 ``esl.morph.range_guard``(원본), 영향 요소 품질 = ``mesh_quality.guard_probe``.
+# 이 절은 그래프 비드 쪽 연결만: 후보 기저(BD_LOADS 표) · derive 표 적용 · BD_MATRIX 보충 · 파일. 새 스냅샷
+# (shape_rules.range_guard 있음)에서만 불린다 — 키 없는 스냅샷은 w_clamp·clamp_w_ranges·range_check 그대로(SH-25).
+def _guard_rules(rules) -> dict | None:
+    """해석된 shape_rules 의 range_guard 블록(꺼짐·없음 = None)."""
+    rg = rules.get("range_guard") if isinstance(rules, dict) else None
+    if not isinstance(rg, dict) or rg.get("enabled") is False:
+        return None
+    return rg
+
+
+def _no_guard(rules):
+    if not rules:
+        return rules
+    r = dict(rules)
+    r["range_guard"] = None
+    return r
+
+
+def _crit(rg: dict, cfg) -> dict:
+    """accept 기준(SH-10): flip_deg = 블록 값(해석 때 select.quality.flip_deg 복사), 없으면 select.quality.flip_deg."""
+    flip = rg.get("flip_deg")
+    if flip is None:
+        flip = select_cfg(cfg)["quality"]["flip_deg"]
+    return {"flip_deg": float(flip), "jac_min": rg.get("jac_min"), "tria_angle_min_deg": rg.get("tria_angle_min_deg"),
+            "area_ratio_min": rg.get("area_ratio_min"), "max_new_fail_ratio": rg.get("max_new_fail_ratio")}
+
+
+def _canon(v):
+    if isinstance(v, dict):
+        return {str(k): _canon(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_canon(x) for x in v]
+    if isinstance(v, bool) or v is None or isinstance(v, str):
+        return v
+    if isinstance(v, (int, float, np.integer, np.floating)):
+        return float(v)
+    return str(v)
+
+
+def _guard_cfg_key(cfg, rules) -> str:
+    """표 머리 cfg_sha256(§4.3): select 설정 키(``_cfg_key``) + 형상 규칙(w_partial·기준·steps·min_keep_frac·combo — 예산 제외)."""
+    rg = _guard_rules(rules) or {}
+    view = {"select": _cfg_key(cfg), "w_partial": _w_partial(rules),
+            "range_guard": _canon({"crit": _crit(rg, cfg) if rg else None, "steps": rg.get("steps"),
+                                   "min_keep_frac": rg.get("min_keep_frac"), "combo": rg.get("combo")})}
+    return hashlib.sha256(json.dumps(view, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _mask_sha(mask) -> str:
+    idx = np.flatnonzero(np.asarray(mask, bool)).astype("<i8")
+    return hashlib.sha256(idx.tobytes()).hexdigest()
+
+
+def _var_key(g: dict, b, typ: str) -> dict:
+    """표 항목 key{kind, segs[[앵커, 요소 수]…], w_segs(W 만), hold}."""
+    k = {"kind": typ, "segs": _seg_keys(g, b.seg_ids), "hold": int(b.hold_fixed)}
+    if typ == "W":
+        k["w_segs"] = _seg_keys(g, _var_segs(b, "W"))
+    return k
+
+
+def _kj(k) -> str:
+    return json.dumps(k, sort_keys=True, separators=(",", ":"))
+
+
+class _Local:
+    __slots__ = ("C", "E", "base", "et", "vs", "x0")
+
+    def __init__(self, E, x0, C, et, vs, base):
+        self.E, self.x0, self.C, self.et, self.vs, self.base = E, x0, C, et, vs, base
+
+
+class _Prober:
+    """시험 모핑(x = x0 + Σ Δ·B_v — ``bead_select.morph`` 와 같은 덧셈) + 영향 요소(노드 변위 > U_EPS 인 노드를 가진 요소 —
+    ``affected_elems`` 규칙) 품질 탐침을 기저 지지 둘레 국부 메시에서."""
+
+    def __init__(self, mesh: dict, crit: dict, qcfg: dict | None):
+        from esl.doe.bead_select import U_EPS
+        self.eps = float(U_EPS)
+        self.X = np.asarray(mesh["x0"], dtype=np.float64)
+        self.C = np.asarray(mesh["conn"], dtype=np.int64)
+        self.et = np.asarray(mesh["elem_type"]).astype(int)
+        self.q = self.et == 4
+        self.crit, self.qcfg = crit, qcfg
+
+    def support(self, idxs) -> np.ndarray:
+        mk = np.zeros(self.X.shape[0], bool)
+        for idx in idxs:
+            mk[np.asarray(idx, np.int64)] = True
+        C = self.C
+        m = mk[C[:, 0]] | mk[C[:, 1]] | mk[C[:, 2]]
+        m[self.q] |= mk[C[self.q, 3]]
+        return np.flatnonzero(m)
+
+    def local(self, vs) -> _Local:
+        from esl.doe import mesh_quality as mq
+        E = self.support([v[0] for v in vs])
+        Ce, ete = self.C[E], self.et[E]
+        qe = ete == 4
+        nodes = np.unique(np.concatenate([Ce[:, :3].ravel(), Ce[qe, 3]]))
+        loc = np.full(self.X.shape[0], -1, np.int64)
+        loc[nodes] = np.arange(nodes.size)
+        Cl = np.empty_like(Ce)
+        Cl[:, :3] = loc[Ce[:, :3]]
+        Cl[:, 3] = np.where(qe, loc[np.maximum(Ce[:, 3], 0)], Cl[:, 2])
+        x0l = self.X[nodes]
+        lv = []
+        for idx, vec in vs:
+            li = loc[np.asarray(idx, np.int64)]
+            k = li >= 0                                   # 요소 없는 노드는 품질과 무관
+            lv.append((li[k], np.asarray(vec, np.float64)[k]))
+        return _Local(E, x0l, Cl, ete, lv, mq.guard_base(x0l, Cl, ete, np.arange(E.size), self.qcfg))
+
+    def ok(self, L: _Local, dvs) -> tuple:
+        from esl.doe import mesh_quality as mq
+        from esl.morph import range_guard as rgm
+        x = np.array(L.x0, dtype=np.float64, copy=True)
+        for (li, vec), dv in zip(L.vs, dvs):
+            if dv != 0.0 and li.size:
+                x[li] += dv * vec
+        u = np.linalg.norm(x - L.x0, axis=1) > self.eps
+        C = L.C
+        q = L.et == 4
+        am = u[C[:, 0]] | u[C[:, 1]] | u[C[:, 2]]
+        am[q] |= u[C[q, 3]]
+        idx = np.flatnonzero(am)
+        c = self.crit
+        pr = mq.guard_probe(L.x0, x, C, L.et, idx, flip_deg=c["flip_deg"], jac_min=c["jac_min"],
+                            tria_angle_min_deg=c["tria_angle_min_deg"], qcfg=self.qcfg,
+                            base=L.base if idx.size == am.size else None)
+        ok, reason, value = rgm.accept(pr, c)
+        n = {"inverted": pr["inverted"], "jac": pr["jac_bad_new"], "tri_angle": pr["tri_bad_new"]}.get(reason)
+        return ok, reason, (None if value is None else _r(value, 6)), n
+
+
+def _qcfg_for(rg: dict, cfg) -> dict | None:
+    if rg.get("max_new_fail_ratio") is None:
+        return None
+    from esl.doe.bead_select import _qcfg
+    return _qcfg(cfg)
+
+
+def _candidate_bases(mesh: dict, D, cfg) -> dict:
+    """후보 변수 기저(``basis_v2`` 와 같은 패키지 호출·램프·검사 — 타이 없음) → {이름: {"v": 기저} | {"error", "detail"}}.
+    한 변수의 실패(누출·달성 오차·짧음·예외)는 그 변수만 건너뜀(``skipped``)."""
+    from beadgraph.checks import achieved, basis_leak
+    bg = _bg()
+    mc = morph_cfg(cfg)
+    X = np.asarray(mesh["x0"], dtype=np.float64)
+    C = _conn(mesh)
+    fx = np.flatnonzero(D.fixed_mask)
+    g, l = D.graph, D.labels
+    excl = getattr(D, "exclude_mask", np.zeros(C.shape[0], bool))
+    lx = {k: np.where(excl, -1, v).astype(np.int32) if k in ("segment", "junction_zone") else v for k, v in l.items()}
+    pk_list, ranges = [], {}
+    for b in D.beads:
+        if b.src != "graph":
+            continue
+        for typ in b.vars:
+            name = var_name(b.id, typ)
+            pk_list.append({"name": name, "kind": typ, "segs": _var_segs(b, typ), "zones": b.zone_ids,
+                            "hold": b.hold_fixed, "bead": b.id})
+            nom = b.D_nom if typ == "D" else b.W_nom
+            lo, hi = (float(v) for v in b.range_basis[typ])
+            ext = max(abs(hi - float(_r(nom))), abs(lo - float(_r(nom))))
+            ranges[name] = [nom - ext, nom + ext]
+    out: dict = {}
+    if not pk_list:
+        return out
+    try:
+        gB = bg.basis(g, lx, X, pk_list, ranges, cfg=mc, fixed=fx, elems=C)
+    except Exception:                                   # noqa: BLE001 — 하나씩 다시(실패한 변수만 basis_error)
+        gB = []
+        for p in pk_list:
+            try:
+                gB += bg.basis(g, lx, X, [p], ranges, cfg=mc, fixed=fx, elems=C)
+            except Exception as exc:                    # noqa: BLE001
+                out[p["name"]] = {"error": "basis_error", "detail": f"{type(exc).__name__}: {exc}"[:200]}
+    leak = {w["var"]: w for w in (basis_leak(gB, g, lx, X, C) if gB else [])}
+    tol = float(mc["morph"]["achieved_tol_mm"])
+    for v in gB:
+        if v["name"] in leak:
+            w = leak[v["name"]]
+            out[v["name"]] = {"error": "basis_error", "detail": f"BG_BASIS_LEAK n={w['n']} max={w['max_mm']:.3g}"}
+            continue
+        if np.asarray(v["idx"]).size == 0:              # 기저 지지 없음(짧은 비드 — BG_SEGMENT_SHORT 는 기저가 있으면 점검)
+            out[v["name"]] = {"error": "short", "detail": None}
+            continue
+        if v["info"].get("short"):                     # basis_v2 와 같이 달성 검사 없이 기저 그대로
+            out[v["name"]] = {"v": v}
+            continue
+        bad = None
+        for end in ranges[v["name"]]:
+            x = bg.morph(X, [v], {v["name"]: end})
+            err = achieved(g, lx, X, x, [v], {v["name"]: end}).get(v["name"])
+            if err is not None and err > (tol if v["kind"] == "D" else 1e-3):
+                bad = f"BG_ACHIEVED_MISMATCH err={err:.3g}"
+                break
+        out[v["name"]] = {"error": "basis_error", "detail": bad} if bad else {"v": v}
+    return out
+
+
+def range_guard_table(mesh: dict, graph: dict, labels: dict, fixed_ids, cfg: dict | None, rules: dict, *,
+                      seed: dict | None = None, exclude_segs=None, clock=None) -> dict:
+    """BD_LOADS(§4.3 SH-13, scope prep): 후보 변수 = ① seed 선택(None = ``auto_seed``)의 그래프 비드 변수 → ② 그 밖의 단일
+    세그먼트 D·W((tier, 앵커) 순, exclude_segs 제외). 후보 기저(램프 = 원래 기본 범위) → 단일 점검(``range_guard.single``) →
+    seed 의 상호작용 묶음 조합 점검(``range_guard.combo``). 예산 = budget.max_evals·prep_timeout_s(기저 계산 포함)·max_vars.
+    반환 = ``esl/range_guard/1`` 문서(멈추지 않으면 같은 입력에서 바이트 같음). rules = 해석된 shape_rules(range_guard 있음)."""
+    from esl.doe import bead_select as bs
+    from esl.morph import range_guard as rgm
+    rg = _guard_rules(rules)
+    if rg is None:
+        raise ValueError("range_guard_table: shape_rules.range_guard 가 없음(꺼짐)")
+    crit = _crit(rg, cfg)
+    bc = rg["budget"]
+    bud = rgm.Budget(bc.get("max_evals"), bc.get("prep_timeout_s"), clock or time.monotonic)
+    steps, mkf = int(rg["steps"]), rg.get("min_keep_frac")
+    sc = select_cfg(cfg)
+    if seed is None:
+        seed = auto_seed(graph, labels, cfg, exclude_segs=exclude_segs)[0]
+    ex = {int(x) for x in exclude_segs or ()}
+    wp = _w_partial(rules)
+    beads, order = [], []                               # order = [(bead id, typ, src)]
+    covered: dict[int, set] = {}
+    for b in seed.get("beads") or []:
+        if b.get("src", "graph") != "graph":
+            continue
+        nb = {"id": b["id"], "name": b.get("name") or f"B{b['id'][1:]}", "src": "graph", "segs": b["segs"]}
+        if b.get("vars"):
+            nb["vars"] = list(b["vars"])
+        if int(b.get("hold_fixed", 1)) == 0:
+            nb["hold_fixed"] = 0
+        ids, _z, net = _resolve_segs(graph, labels, b["segs"], b["id"])
+        vs = nb.get("vars") or (["D"] if net else _possible_vars(graph, ids, wp))
+        beads.append(nb)
+        order += [(b["id"], t, "seed") for t in vs]
+        if len(ids) == 1 and not net and int(b.get("hold_fixed", 1)) == 1:
+            covered[ids[0]] = set(vs)
+    singles = sorted((s for s in graph["segments"] if s["type"] != "base" and int(s["id"]) not in ex
+                      and int(s["anchor"]) >= 0),
+                     key=lambda s: (int(s["tier"]), int(s["anchor"])))
+    for s in singles:
+        vs = [t for t in _possible_vars(graph, [s["id"]], wp) if t not in covered.get(int(s["id"]), set())]
+        if not vs:
+            continue
+        bid = f"s{int(s['id'])}"
+        beads.append({"id": bid, "name": bid.upper(), "src": "graph", "segs": [{"anchor": int(s["anchor"])}],
+                      "vars": vs})
+        order += [(bid, t, "segment") for t in vs]
+    mx = int(bc.get("max_vars") or len(order))
+    trimmed = order[mx:]
+    order = order[:mx]
+    if trimmed:
+        bud.stop("vars")
+    keep_ids = {o[0] for o in order}
+    kept = []
+    for nb in beads:
+        if nb["id"] not in keep_ids:
+            continue
+        vs = [t for (i, t, _s) in order if i == nb["id"]]
+        nb = dict(nb)
+        nb["vars"] = vs
+        kept.append(nb)
+    norm = {"schema_version": SCHEMA_VERSION,
+            "feature_angle_deg": float(seed.get("feature_angle_deg") or sc["feature_angle_deg"]), "beads": kept,
+            "ties": [], "fixed_user": seed.get("fixed_user") or bs._norm_set(None, "fixed_user", 10_000_000),
+            "exclude": seed.get("exclude") or bs._norm_set(None, "exclude", 10_000_000),
+            "graph": {"sha256": graph_sha_of(graph), "rules": int(graph["rules"]), "edits": {}}}
+    D = derive_obj_v2(mesh, norm, cfg, graph, labels, fixed_node_ids=fixed_ids, shape_rules=_no_guard(rules))
+    by = {b.id: b for b in D.beads}
+    skipped = []
+    for bid, typ, _src in trimmed:
+        if bid.startswith("s"):
+            sid = int(bid[1:])
+            k = {"kind": typ, "segs": _seg_keys(graph, [sid]), "hold": 1}
+            if typ == "W":
+                k["w_segs"] = _seg_keys(graph, [sid])
+        else:
+            src = next(b for b in beads if b["id"] == bid)
+            ids, _z, _n = _resolve_segs(graph, labels, src["segs"], bid)
+            k = {"kind": typ, "segs": _seg_keys(graph, ids), "hold": int(src.get("hold_fixed", 1))}
+            if typ == "W":
+                k["w_segs"] = _seg_keys(graph, w_segs(graph, ids) if wp else ids)
+        skipped.append({"key": k, "reason": "budget", "detail": "max_vars"})
+    bases = _candidate_bases(mesh, D, cfg) if order else {}
+    P = _Prober(mesh, crit, _qcfg_for(rg, cfg))
+    entries, by_name, supports = [], {}, {}
+    for bid, typ, src in order:
+        b = by[bid]
+        name = var_name(bid, typ)
+        key = _var_key(D.graph, b, typ)
+        r = bases.get(name) or {"error": "basis_error", "detail": None}
+        if "error" in r:
+            skipped.append({"key": key, "reason": r["error"], "detail": r.get("detail")})
+            continue
+        v = r["v"]
+        nom = float(_r(b.D_nom if typ == "D" else b.W_nom))
+        lo, hi = (float(x) for x in b.range_basis[typ])
+        L = P.local([(v["idx"], v["vec"])])
+        res = rgm.single(name, nom, lo, hi, lambda val, L=L, nom=nom: P.ok(L, [val - nom]), steps=steps, budget=bud,
+                         min_keep_frac=mkf)
+        if res.get("skipped"):
+            skipped.append({"key": key, "reason": "budget", "detail": None})
+            continue
+        e = {"key": key, "var": name if src == "seed" else None, "src": src, "nominal": res["nominal"],
+             "from": res["from"], "usable": res["usable"], "state": res["state"], "ends": res["ends"]}
+        entries.append(e)
+        if src == "seed":
+            by_name[name] = (e, v)
+            supports[name] = L.E
+    combos = []
+    cc = rg.get("combo") or {}
+    if cc.get("enabled", True) and by_name:
+        for grp in rgm.interacting(supports):
+            _combo_one(P, rgm, grp, {n: by_name[n] for n in grp}, cc, steps, bud, combos, skipped,
+                       lambda n: by_name[n][0]["key"])
+    meta = {"graph_sha256": norm["graph"]["sha256"], "cfg_sha256": _guard_cfg_key(cfg, rules),
+            "fixed_sha256": _mask_sha(D.fixed_mask), "exclude_sha256": _mask_sha(D.exclude_mask),
+            "selection_sha256": None, "steps": steps, "min_keep_frac": mkf, "max_vars": bc.get("max_vars")}
+    return rgm.doc("prep", entries, combos, skipped, bud, crit, meta)
+
+
+def _combo_one(P, rgm, grp, items, cc, steps, bud, combos, skipped, keyf):
+    """조합 점검 1묶음: items{이름: (항목{nominal, usable|default}, 기저 dict)} → combos/skipped 에 추가, 결과 반환."""
+    names = sorted(grp)
+    tup = [(n, items[n][0]["nominal"], items[n][0]["usable"][0], items[n][0]["usable"][1]) for n in names]
+    L = P.local([(items[n][1]["idx"], items[n][1]["vec"]) for n in names])
+    noms = [t[1] for t in tup]
+    res = rgm.combo(tup, lambda vals: P.ok(L, [vals[n] - v0 for n, v0 in zip(names, noms)]),
+                    full_max=int(cc["full_max_vars"]), samples=int(cc["samples"]), steps=steps, budget=bud,
+                    max_group=cc.get("max_group"))
+    if res is None:
+        return None
+    members = [keyf(n) for n in names]
+    if res.get("skipped"):
+        skipped.append({"key": {"combo": members}, "reason": res["skipped"],
+                        "detail": {"n": res.get("n", len(names)), "vars": names}})
+        return res
+    c = {"members": members, "vars": names, "corners": res["corners"], "bad_n": res["bad_n"], "scale": res["scale"],
+         "reason": res["reason"], "value": res["value"], "usable": res["usable"]}
+    combos.append(c)
+    return c
+
+
+def _unchecked(frm) -> dict:
+    return {"state": "unchecked", "from": [float(x) for x in frm], "usable": None, "reason": None, "value": None,
+            "combo_scale": None}
+
+
+def _apply_single(b, typ: str, e: dict, nom: float) -> None:
+    """§4.4 SH-15: 항목(state·usable·ends) → 변수 행 guard + 기본 범위·feasible(위반 쪽) + RG_RANGE_LIMITED / RG_VAR_BLOCKED."""
+    name = var_name(b.id, typ)
+    frm = [float(x) for x in b.range_basis[typ]]
+    u = [float(x) for x in e["usable"]]
+    bad = [x for x in e["ends"] if not x["ok"]]
+    g = {"state": e["state"], "from": frm, "usable": u, "reason": bad[0]["reason"] if bad else None,
+         "value": bad[0]["value"] if bad else None, "combo_scale": None}
+    b.guard[typ] = g
+    b.warnings[:] = [w for w in b.warnings if not (w.get("code") == "RG_UNCHECKED" and w.get("var") == name)]
+    if e["state"] == "ok":
+        return
+    sides = [x["side"] for x in bad]
+    if e["state"] == "limited" and not (u[0] < nom < u[1]):
+        g["state"] = "blocked"                          # 한쪽이 공칭에 붙음(그쪽 keep 0) — 축소 범위로 쓸 수 없어 막힘으로
+    if g["state"] == "blocked":
+        if u[0] < u[1]:
+            b.range_default[typ] = [_r(u[0]), _r(u[1])]
+        b.warnings.append({"code": "RG_VAR_BLOCKED", "level": "warning", "bead": b.id, "var": name, "usable": u,
+                           "reason": g["reason"]})
+        return
+    old = list(b.range_default[typ])
+    b.range_default[typ] = [_r(u[0]), _r(u[1])]
+    fe = list(b.range_feasible[typ])
+    if "lo" in sides:
+        fe[0] = max(fe[0], _r(u[0]))
+    if "hi" in sides:
+        fe[1] = min(fe[1], _r(u[1]))
+    b.range_feasible[typ] = fe
+    b.warnings.append({"code": "RG_RANGE_LIMITED", "level": "info", "bead": b.id, "var": name, "from": old,
+                       "to": list(b.range_default[typ]), "side": sides[0] if len(sides) == 1 else "both",
+                       "reason": g["reason"], "value": g["value"]})
+
+
+def _tie_entry(members, own, typ, nom_c) -> dict:
+    """타이 대표 = 구성원 공통 Δ(BG-X-11 규칙): usable = 공칭 + [max Δlo, min Δhi](inward), state = 가장 나쁜 것."""
+    from esl.morph import range_guard as rgm
+    es = [own[(m.id, typ)] for m in members]
+    dlo = max(float(e["usable"][0]) - float(e["nominal"]) for e in es)
+    dhi = min(float(e["usable"][1]) - float(e["nominal"]) for e in es)
+    rank = {"ok": 0, "limited": 1, "blocked": 2}
+    st = max((e["state"] for e in es), key=lambda s: rank.get(s, 0))
+    ends = [x for e in es for x in e["ends"] if not x["ok"]] or es[0]["ends"]
+    return {"state": st, "usable": [rgm.inward(nom_c + dlo, nom_c), rgm.inward(nom_c + dhi, nom_c)], "ends": ends}
+
+
+def apply_range_guard(D, table: dict | None, cfg) -> None:
+    """derive(API·BD_MATRIX 같은 코드, SH-14·15·16): 표 머리(graph·cfg·fixed·exclude sha, toggle 없음)와 항목 key·from 이 맞는
+    그래프 변수에 §4.4 적용, 맞지 않으면 guard.state unchecked + 정보 RG_UNCHECKED{var}. 조합은 구성원이 모두 맞을 때만."""
+    rules = getattr(D, "shape_rules", None)
+    ng = D.norm.get("graph") or {}
+    ok_hdr = (isinstance(table, dict) and table.get("schema") == RANGE_GUARD_SCHEMA and
+              table.get("graph_sha256") == ng.get("sha256") and not (ng.get("edits") or {}).get("toggle") and
+              table.get("cfg_sha256") == _guard_cfg_key(cfg, rules) and
+              table.get("fixed_sha256") == _mask_sha(D.fixed_mask) and
+              table.get("exclude_sha256") == _mask_sha(D.exclude_mask))
+    ents = {_kj(e["key"]): e for e in (table.get("entries") or [])} if ok_hdr else {}
+    tie = _tie_of(D.norm)
+    by = {b.id: b for b in D.beads if b.src == "graph"}
+    own = {}
+    for b in by.values():
+        b.guard = {}
+        for typ in b.vars:
+            e = ents.get(_kj(_var_key(D.graph, b, typ)))
+            if e is not None and [float(x) for x in e["from"]] == [float(x) for x in b.range_basis[typ]]:
+                own[(b.id, typ)] = e
+    car = {}
+    for b in by.values():
+        grp = tie.get(b.id)
+        if grp and grp[0] != b.id:
+            continue
+        for typ in b.vars:
+            members = [by[x] for x in (grp or [b.id]) if x in by]
+            nom = float(_r(b.D_nom if typ == "D" else b.W_nom))
+            if any((m.id, typ) not in own for m in members):
+                b.guard[typ] = _unchecked(b.range_basis[typ])
+                b.warnings.append({"code": "RG_UNCHECKED", "level": "info", "bead": b.id, "var": var_name(b.id, typ)})
+                continue
+            e = own[(b.id, typ)] if len(members) == 1 else _tie_entry(members, own, typ, nom)
+            _apply_single(b, typ, e, nom)
+            if len(members) == 1:
+                car[_kj(_var_key(D.graph, b, typ))] = (b, typ)
+    for c in (table.get("combos") or []) if ok_hdr else []:
+        tg = [car.get(_kj(k)) for k in c["members"]]
+        if any(t is None for t in tg):
+            continue
+        _apply_combo(tg, c)
+
+
+def _apply_combo(targets, c: dict) -> None:
+    """조합 scale < 1 → 묶음 변수 default_range 만 조합 usable 로(feasible 불변) + 정보 RG_COMBO_LIMITED(첫 구성원 비드)."""
+    names = []
+    for (b, typ), vn in zip(targets, c["vars"]):
+        u = [float(x) for x in c["usable"][vn]]
+        nom = float(_r(b.D_nom if typ == "D" else b.W_nom))
+        g = b.guard.get(typ) or {}
+        if u[0] < nom < u[1]:
+            b.range_default[typ] = [_r(u[0]), _r(u[1])]
+        old = g.get("combo_scale")
+        g["combo_scale"] = float(c["scale"]) if old is None else float(old) * float(c["scale"])
+        names.append(var_name(b.id, typ))
+    b0 = targets[0][0]
+    b0.warnings.append({"code": "RG_COMBO_LIMITED", "level": "info", "vars": names, "corners": c["corners"],
+                        "bad_n": c["bad_n"], "scale": c["scale"], "reason": c["reason"]})
+
+
+def guard_selection(mesh: dict, D, B, cfg: dict | None, *, only=None, clock=None) -> dict | None:
+    """BD_MATRIX(SH-14, scope selection): 선택의 그래프 변수 중 unchecked(또는 only 이름)만 단일 점검(선택 기저 B — 타이 =
+    구성원 합) → §4.4 적용 + 선택 전체 상호작용 묶음 조합 점검(현재 기본 범위 기준) → 문서. D 의 범위·guard·경고를 제자리 수정
+    (이번 행렬은 sha 고정 — 호출자가 params.json 에 반영). 예산 = max_evals·matrix_timeout_s, 넘으면 남은 변수 unchecked +
+    D.warnings RG_BUDGET. shape_rules.range_guard 가 없으면 None."""
+    from esl.morph import range_guard as rgm
+    rules = getattr(D, "shape_rules", None)
+    rg = _guard_rules(rules)
+    if rg is None:
+        return None
+    crit = _crit(rg, cfg)
+    bc = rg["budget"]
+    bud = rgm.Budget(bc.get("max_evals"), bc.get("matrix_timeout_s"), clock or time.monotonic)
+    steps, mkf = int(rg["steps"]), rg.get("min_keep_frac")
+    tie = _tie_of(D.norm)
+    by = {b.id: b for b in D.beads if b.src == "graph"}
+    bv = {v["name"]: v for v in B.vars}
+    P = _Prober(mesh, crit, _qcfg_for(rg, cfg))
+    carriers = []
+    for b in by.values():
+        grp = tie.get(b.id)
+        if grp and grp[0] != b.id:
+            continue
+        if not hasattr(b, "guard"):
+            b.guard = {}
+        for typ in b.vars:
+            if var_name(b.id, typ) in bv:
+                carriers.append((var_name(b.id, typ), b, typ, grp))
+    carriers.sort(key=lambda t: t[0])
+    want = set(only) if only is not None else None
+    entries, skipped, total, done = [], [], 0, 0
+    for name, b, typ, grp in carriers:
+        st = (b.guard.get(typ) or {}).get("state", "unchecked")
+        if (want is not None and name not in want) or (want is None and st != "unchecked"):
+            continue
+        total += 1
+        key = _var_key(D.graph, b, typ)
+        if grp:
+            key["tie"] = [_var_key(D.graph, by[x], typ) for x in grp if x in by]
+        v = bv[name]
+        nom = float(v["nominal"])
+        lo, hi = (float(x) for x in b.range_basis[typ])
+        L = P.local([(v["idx"], v["vec"])])
+        res = rgm.single(name, nom, lo, hi, lambda val, L=L, nom=nom: P.ok(L, [val - nom]), steps=steps, budget=bud,
+                         min_keep_frac=mkf)
+        if res.get("skipped"):
+            skipped.append({"key": key, "reason": "budget", "detail": None})
+            if (b.guard.get(typ) or {}).get("state") is None:
+                b.guard[typ] = _unchecked(b.range_basis[typ])
+            continue
+        done += 1
+        e = {"key": key, "var": name, "src": "selection", "nominal": res["nominal"], "from": res["from"],
+             "usable": res["usable"], "state": res["state"], "ends": res["ends"]}
+        entries.append(e)
+        _apply_single(b, typ, e, nom)
+    combos = []
+    cc = rg.get("combo") or {}
+    if cc.get("enabled", True):
+        sup, items = {}, {}
+        for name, b, typ, _grp in carriers:
+            g = b.guard.get(typ) or {}
+            if g.get("state", "unchecked") == "unchecked":
+                continue
+            v = bv[name]
+            sup[name] = P.support([v["idx"]])
+            items[name] = ({"nominal": float(v["nominal"]), "usable": [float(x) for x in b.range_default[typ]]}, v)
+        keyof = {name: _var_key(D.graph, b, typ) for name, b, typ, _g in carriers}
+        tgt = {name: (b, typ) for name, b, typ, _g in carriers}
+        for grp_ in rgm.interacting(sup):
+            c = _combo_one(P, rgm, grp_, items, cc, steps, bud, combos, skipped, lambda n: keyof[n])
+            if c is not None and "scale" in c:
+                _apply_combo([tgt[n] for n in c["vars"]], c)
+            elif c is not None and c.get("skipped") == "max_group":
+                D.warnings.append({"code": "RG_COMBO_SKIPPED", "level": "info", "vars": c["vars"], "n": c["n"]})
+    if bud.stopped is not None:
+        D.warnings.append({"code": "RG_BUDGET", "level": "info", "done": done, "total": total, "evals": bud.evals,
+                           "stopped": bud.stopped})
+    meta = {"graph_sha256": (D.norm.get("graph") or {}).get("sha256"), "cfg_sha256": _guard_cfg_key(cfg, rules),
+            "fixed_sha256": _mask_sha(D.fixed_mask), "exclude_sha256": _mask_sha(D.exclude_mask),
+            "selection_sha256": D.sha256, "steps": steps, "min_keep_frac": mkf, "max_vars": bc.get("max_vars")}
+    return rgm.doc("selection", entries, combos, skipped, bud, crit, meta)
+
+
+def guard_info(doc: dict | None) -> list[dict]:
+    """준비 표 → 준비 정보(§8): RG_BUDGET{done, total, evals, stopped}(멈췄을 때) · RG_COMBO_SKIPPED{vars, n}(묶음 초과)."""
+    if not doc:
+        return []
+    out = []
+    for s in doc.get("skipped") or []:
+        if s.get("reason") == "max_group":
+            dt = s.get("detail") or {}
+            out.append({"code": "RG_COMBO_SKIPPED", "level": "info", "vars": dt.get("vars") or [], "n": dt.get("n")})
+    b = doc.get("budget") or {}
+    if b.get("stopped") is not None:
+        n_sk = sum(1 for s in doc.get("skipped") or [] if s.get("reason") == "budget")
+        done = len(doc.get("entries") or [])
+        out.append({"code": "RG_BUDGET", "level": "info", "done": done, "total": done + n_sk, "evals": b.get("evals"),
+                    "stopped": b.get("stopped")})
+    return out
+
+
+def guard_result(doc: dict | None, seconds: float | None = None) -> dict | None:
+    """작업 결과·prep/input.json 의 range_guard 요약 {entries, limited, blocked, combos, evals, seconds, stopped}."""
+    if not doc:
+        return None
+    es = doc.get("entries") or []
+    return {"entries": len(es), "limited": sum(1 for e in es if e["state"] == "limited"),
+            "blocked": sum(1 for e in es if e["state"] == "blocked"), "combos": len(doc.get("combos") or []),
+            "evals": (doc.get("budget") or {}).get("evals"),
+            "seconds": None if seconds is None else round(float(seconds), 3),
+            "stopped": (doc.get("budget") or {}).get("stopped")}
+
+
+def outside_guard(rows: list[dict], values: dict) -> dict | None:
+    """미리보기 셀(SH-14 BD_SELECT_GRID): 안 값이 변수 행 guard.usable 밖 → 경고 RG_OUTSIDE_GUARD{vars[{name, value, usable}]}
+    (경고만 — 상태 불변). guard 없는 행(옛 스냅샷·elems 변수)·unchecked 는 보지 않음."""
+    out = []
+    for r in rows or []:
+        g = r.get("guard") or {}
+        u = g.get("usable")
+        if not u or r.get("name") not in values:
+            continue
+        v = float(values[r["name"]])
+        if v < float(u[0]) - 1e-9 or v > float(u[1]) + 1e-9:
+            out.append({"name": r["name"], "value": _r(v), "usable": [float(u[0]), float(u[1])]})
+    return {"code": "RG_OUTSIDE_GUARD", "level": "warning", "vars": out} if out else None
+
+
+def write_range_guard(path: str, doc: dict, guard=None) -> str:
+    """정렬·compact·ASCII(graph_bytes 와 같은 직렬화) → sha256."""
+    g = guard or (lambda p: p)
+    blob = json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+    with open(g(path), "wb") as fh:
+        fh.write(blob)
+    return hashlib.sha256(blob).hexdigest()
+
+
+def load_range_guard(prep_dir: str) -> dict | None:
+    """prep/ (또는 prep/select/, 또는 select/<sha12>/ 처럼 파일이 바로 있는 폴더) → 표(스키마 확인) | None."""
+    d = prep_dir
+    if not os.path.isfile(os.path.join(d, RANGE_GUARD_JSON)):
+        d = prep_dir if os.path.isfile(os.path.join(prep_dir, GRAPH_JSON)) else os.path.join(prep_dir, "select")
+    p = os.path.join(d, RANGE_GUARD_JSON)
+    if not os.path.isfile(p):
+        return None
+    try:
+        with open(p, "rb") as fh:
+            doc = json.loads(fh.read().decode("ascii"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) and doc.get("schema") == RANGE_GUARD_SCHEMA else None

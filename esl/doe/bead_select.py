@@ -1638,12 +1638,14 @@ def affected_elems(mesh: dict, x0, x, eps: float = U_EPS) -> np.ndarray:
     return m
 
 
-def range_check(mesh: dict, derived: Derived, B: Basis, cfg: dict | None = None) -> list[dict]:
+def range_check(mesh: dict, derived: Derived, B: Basis, cfg: dict | None = None, *, only=None) -> list[dict]:
     """SR-D-33 기본 범위 끝 점검(기저가 있을 때 — BD_MATRIX): 변수마다 default_range 양 끝을 그 변수만 바꾼 안으로 모핑해
     뒤집힘(``design_state`` 와 같은 판정)이 있으면 공칭 쪽으로 ``range.check_steps`` 회 이분해 뒤집힘 없는 끝 ``usable`` 을 찾고 그 비드에
     경고 ``SELECT_RANGE_INVERTS{var, lo_mm, hi_mm, usable[lo, hi], inverted[lo, hi]}`` 를 단다(범위는 바꾸지 않음 — 기저·R_auto 불변).
     check_steps 0 = 변수별 끝 점검 끔. v0.16.2 AD-D-9: 그래도 일찍 끝나지 않고 조합 점검(SR-D-39)은 ``range.combo_samples`` > 0
-    으로만 정함(끝 = 기본 범위 끝 그대로). 반환 = 단 경고 목록. 뒤집힘이 없으면 아무것도 바꾸지 않음."""
+    으로만 정함(끝 = 기본 범위 끝 그대로). 반환 = 단 경고 목록. 뒤집힘이 없으면 아무것도 바꾸지 않음.
+    v0.21.0 SH-14: only = 점검할 변수 이름 모음(새 스냅샷 BD_MATRIX 가 elems 변수만 — 그래프 변수는 range guard). 끝 점검·조합 모두
+    그 변수만. None = 모든 변수(v0.20.0 그대로)."""
     sc = _cfg(cfg)
     n = int(sc["range"]["check_steps"] or 0)
     n_combo = int(sc["range"]["combo_samples"] or 0)
@@ -1658,7 +1660,10 @@ def range_check(mesh: dict, derived: Derived, B: Basis, cfg: dict | None = None)
         return int(st["quality"]["inverted"]) if st["code"] == "SELECT_MORPH_INVERTED" else 0
 
     ends: list = []
+    want = None if only is None else set(only)
     for row in params_table(derived, cfg):
+        if want is not None and row["name"] not in want:
+            continue
         lo, hi = (float(v) for v in row["default_range"])
         nom = float(row["nominal"])
         res = []
