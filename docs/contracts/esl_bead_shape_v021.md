@@ -1,6 +1,6 @@
 # 계약: 비드 형상 변화 개선 — 구간별 W · 품질 기반 변수 범위 제한 · 큰 모델 cad 완화 직행 (BEAD_SHAPE, v0.21.0)
 
-- 상태: **초안(계약만 — 구현 금지 단계)**. 사용자 결정 Q-SH-1~3(§13)은 **권고안을 기본값으로** 적었다. 답이 다르면 §6 기본값만 바꾸고 구조는 그대로.
+- 상태: **구현 완료(v0.21.0 통합, 2026-11-16)**. 사용자 결정 Q-SH-1~3(§13) **확정 = 권고안**(Q-SH-1 A 표준 · Q-SH-2 STEP 면 ≥ 1500 · Q-SH-3 경고만·순위 유지) — §6 기본값 그대로. 구현 중 바뀐 점은 §14.
 - 버전: **v0.21.0** (`release/v0.21.0`, 기준 main 72e9e8d = v0.20.0). migration **불필요**(새 값 = `bead_does.inputs`·작업 `params.doe` JSONB, 작업 폴더 파일).
 - 관계(새 스냅샷에서만 이 문서 우선, 옛 스냅샷은 기존 계약 그대로):
   - `esl_beadgraph.md` BG-D-17 "W = 구성 세그먼트가 모두 W 를 가질 때만"·BG-X-3(D-0.17.0-WBOTH 의 비드 단위 부분) → §3 으로 대체. **세그먼트 단위 WBOTH(입구 선 양쪽 ≥ 3 노드일 때만 `entry_width`)는 그대로**.
@@ -81,10 +81,11 @@ SCHEMA = "esl/range_guard/1"
 CRITERIA = ("inverted", "jac", "tri_angle", "area_ratio", "new_fail")      # accept 의 판정·보고 순서
 class Budget:                      # Budget(max_evals, timeout_s, clock=time.monotonic); take() -> bool(남았으면 1 차감); stopped -> None|"evals"|"time"|"vars"
 def accept(probe: dict, crit: dict) -> tuple[bool, str | None, float | None]   # (통과, 첫 위반 기준, 그 값)
-def single(name, nominal, lo, hi, ok_fn, *, steps, budget) -> dict             # §4.2 — ok_fn(v) -> (bool, reason, value)
+def single(name, nominal, lo, hi, ok_fn, *, steps, budget, min_keep_frac=None) -> dict   # §4.2 — ok_fn(v) -> (bool, reason, value[, n 위반 요소 수]); min_keep_frac 있으면 blocked 판정
 def interacting(supports: dict[str, np.ndarray]) -> list[list[str]]          # 변수 → 영향 요소 index, 공유 요소 union-find, 크기 ≥ 2 묶음만, 이름 정렬
 def corners(n: int, *, full_max: int, samples: int) -> np.ndarray             # int8 (m, n): n ≤ full_max → 2^n 전부, 아니면 default_rng(0) samples 개
-def combo(group: list[tuple[str, float, float, float]], ok_multi, *, full_max, samples, steps, budget) -> dict | None
+def combo(group: list[tuple[str, float, float, float]], ok_multi, *, full_max, samples, steps, budget, max_group=None) -> dict | None
+    # max_group 있으면 len(group) > max_group → {"skipped": "max_group", "vars", "n"}(RG_COMBO_SKIPPED)
 def blocked(nominal, frm, usable, min_keep_frac) -> tuple[bool, bool]          # (lo 쪽 막힘, hi 쪽 막힘)
 def inward(v, nominal) -> float                                               # 1e-4 공칭 쪽 반올림(bead_graph._inward 와 같은 식 — 이곳이 원본)
 def doc(scope, entries, combos, skipped, budget, crit, meta) -> dict          # §4.6 스키마(결정적 키 순서)
@@ -96,7 +97,8 @@ def rank_flag(q: dict, rule: dict) -> dict | None
     # q = mesh_quality.summarize 결과, rule = 해석된 rank_quality{fail_ratio, tria_pct(숫자)} -> {"fail_ratio", "tria_pct", "over": [...]} | None
 
 # esl/doe/mesh_quality.py (추가만)
-def guard_probe(x0, x, conn, elem_type, idx, *, flip_deg, jac_min, tria_angle_min_deg, qcfg=None) -> dict
+def guard_probe(x0, x, conn, elem_type, idx, *, flip_deg, jac_min, tria_angle_min_deg, qcfg=None, base=None) -> dict
+    # base = guard_base(x0, conn, elem_type, idx, qcfg)(공칭 쪽 1회 계산 재사용 — 없으면 안에서 계산, 결과 같음)
     # -> {n_affected, inverted, jac_min, jac_bad_new, tri_angle_min, tri_bad_new, area_ratio_min, new_fail_ratio|None}
 ```
 
@@ -177,10 +179,12 @@ s = 1 에서 모든 꼭짓점 통과 → None
 
 ### 4.4 적용 규칙 (SH-15·16)
 - `state limited` → `default_range` = usable(공칭을 엄격히 품을 때만), `feasible` 의 **위반 쪽** = min/max(feasible, usable)(BG-X-11 과 같음 — 사용자가 넓히면 기존 `RANGE_OUTSIDE_FEASIBLE` 경고, 막지 않음). 정보 `RG_RANGE_LIMITED{bead, var, from, to, side, reason, value}`.
+- (구현 반영 SH-28) `state limited` 인데 usable 의 한쪽 끝이 공칭에 붙으면(공칭을 엄격히 품지 못함 — 그쪽 keep 0) **blocked 로 처리**: `default_range` = usable, `use_default: false`, 경고 `RG_VAR_BLOCKED`(행 `guard.state` = blocked). 범위를 그대로 두면 LHS 안이 위반 쪽에 떨어져 `RG_OUTSIDE_GUARD` 가 나므로(V-SH-10).
 - `state blocked`(양쪽 keep < `min_keep_frac`) → `default_range` = usable, `use_default: false`, 경고 `RG_VAR_BLOCKED{bead, var, usable, reason}`.
 - 조합 scale < 1 → 묶음 변수 `default_range` 만 scale 적용(feasible 불변), 정보 `RG_COMBO_LIMITED{vars, corners, bad_n, scale, reason}`. 묶음 구성원이 **모두** 표에 맞을 때만(아니면 BD_MATRIX 가 다시).
 - 타이 대표 변수 = 구성원 공통 Δ(BG-X-11 규칙), 시험 모핑은 `basis_v2` 의 대표 기저 그대로(구성원 합).
 - 기저·램프 L(`range_basis`)·`BG_RAMP_SHORT`·`use_default` 의 `BG_SEGMENT_SHORT` 규칙 불변.
+- (구현 반영 SH-30) 후보 기저의 지지가 비면(짧은 비드) `skipped{reason: short}`. `BG_SEGMENT_SHORT` 변수라도 **기저 지지가 있으면 점검**한다(달성 검사 없이 기저 그대로 — `basis_v2`·`w_clamp_table` 과 같은 꼴, V-SH-9 일치).
 - 변수 행 `guard = {state: ok|limited|blocked|unchecked, from:[lo,hi], usable:[lo,hi]|null, reason|null, value|null, combo_scale|null}`(새 스냅샷의 그래프 변수만).
 
 ### 4.5 비용 상한 (SH-17)
@@ -388,13 +392,14 @@ bead_doe:
 | R-SH-6 | 면 수는 크기의 대리 지표(면 수 적고 곡면 큰 모델은 못 잡음) | `min_step_mb` 보조 키, 후속: 같은 STEP sha 의 이전 cad 시간 초과 기록으로 직행(비범위) |
 | R-SH-7 | 표에 없는 선택(사용자 묶음·편집)은 첫 행렬에 위험 안이 들어갈 수 있음(지금과 같음) | `RG_UNCHECKED` 표시, BD_MATRIX 보충 후 다음 행렬부터 축소, 셀 `RG_OUTSIDE_GUARD` |
 | R-SH-8 | guard 가 esl 안에만 있어 physicsai 가 아직 못 씀 | §9.3 후속(패키지 1.2.0 이관 계획 명시) |
+| R-SH-9 | (미해결) H6 링 D 15개가 영향 요소를 공유해 한 묶음이 되어 `combo.max_group`(기본값 8)을 넘음 → 조합 점검 생략 `RG_COMBO_SKIPPED` | 단일 점검·안 판정이 받침. 후속: 큰 묶음 분할(비드별·이웃 쌍) 또는 표본 조합 |
 
 ## 12. 파일 소유권 (겹침 0) · 순서
 
 | 에이전트 | 소유 파일 | 금지 | 시험 |
 |---|---|---|---|
 | **impl-geom**(비드 그래프·모핑 코어) | 신규 `esl/morph/range_guard.py`, 신규 `esl/mesh/route.py`, `esl/doe/mesh_quality.py`(`guard_probe` 추가만), `esl/doe/bead_graph.py`(`w_segs`·`_possible_vars(w_partial=)`·`_bead_nominals`·`_check_ties`·`derive_obj_v2`/`derive_v2`/`normalize_v2` 의 `shape_rules`·`range_guard` 인자·`GraphBead.w_seg_ids/w_cover`·`params_rows_v2` 행 키·`basis_v2` W segs = S_W·`range_guard_table`·`guard_selection`·`write_range_guard`·`load_range_guard`·`RANGE_GUARD_JSON/SCHEMA`·`_graph_figures` W 대표), `esl/doe/bead_select.py`(`range_check(…, only=None)` 키워드 추가만); 신규 시험 `tests/doe/test_range_guard.py`·`tests/mesh/test_route.py`·`tests/doe/test_bead_graph_wpartial.py`·`tests/doe/test_bead_graph_guard.py`·`tests/doe/synth_guard.py`, `tests/doe/test_mesh_quality.py`·`test_bead_graph_perf.py` 추가분 | `packages/beadgraph/**`(전원 금지), `stages.py`·`step_graph.py`·`transfer_plan.py`·`__init__.py`·`report_doe.py`·`resources/**`·`backend/**`·`worker/**`·`frontend/**` | V-SH-1~10·17 |
-| **impl-backend**(설정·계획·워커 단계·API) | `esl/doe/__init__.py`(DEFAULTS `shape_rules`), `esl/doe/transfer_plan.py`(열 4개·`resolve_shape`·`shape_hash_view`), `esl/doe/stages.py`(`_shape`·BD_LOADS `_sel_range_guard`/legacy `_sel_w_clamp` 분기·`_sel_prepare` 보충·`_sel_cfg_sha`·셀 `RG_OUTSIDE_GUARD`·`_cmp_mesh_shape` 직행·`_cmp_relaxed_direct`·`_cmp_mesh0` route 행·`_cmp_post`/`bd_post` mq·CSV 열), `esl/doe/step_graph.py`(mesh0 `route`·`quality`·mq 경고), `esl/doe/report_doe.py`(한계 절 1줄), `resources/doe_messages.json`(§8 코드), `backend/esl_platform/core/config.py`(`BeadDoeShapeRulesCfg`·하위 Cfg), `config/esl_platform.example.yaml`·`config/esl_platform.prod.example.yaml`, `backend/esl_platform/api/services/doe.py`(스냅샷·inputs·복제·settings), `backend/esl_platform/api/services/doe_select.py`(`range_guard.json` 읽기·캐시 키·`shape_rules` 전달·`GRAPH_ROW_KEYS`), `backend/esl_platform/api/schemas.py`, `docs/contracts/openapi_p1b.json`, `worker/esl_worker/doe_jobs.py`(결과 키 통과); 시험 `tests/doe/test_transfer_plan.py`(추가)·신규 `tests/doe/test_shape_rules_modes.py`·`backend/tests/test_doe_shape_rules_api.py`·`worker/tests/test_doe_shape_rules_jobs.py` | `packages/beadgraph/**`, impl-geom 소유 파일, `frontend/**`, `evaluate.py`·`rank.py`·`load_transfer.py`·`stiffness_metric.py`·`mesh_gmsh.py`·`mesh_refine.py`(변경 금지 — 직행은 기존 `run_isolated`·`stage_cap` 호출만) | V-SH-11~15 |
+| **impl-backend**(설정·계획·워커 단계·API) | (통합 승인 추가) `worker/esl_worker/register.py`(`COMPARE_SHAPE_KEYS` += `route`·`mq` — 새 스냅샷 행만, 없으면 뺌 · `_select_step_prep` 의 ③ `mesh.route`·`mesh.quality` 전달), `backend/esl_platform/core/opt_core.py`(`doe_transfer_plan` 모듈 등록 — 스냅샷 해석 `resolve_shape`); `esl/doe/__init__.py`(DEFAULTS `shape_rules`), `esl/doe/transfer_plan.py`(열 4개·`resolve_shape`·`shape_hash_view`), `esl/doe/stages.py`(`_shape`·BD_LOADS `_sel_range_guard`/legacy `_sel_w_clamp` 분기·`_sel_prepare` 보충·`_sel_cfg_sha`·셀 `RG_OUTSIDE_GUARD`·`_cmp_mesh_shape` 직행·`_cmp_relaxed_direct`·`_cmp_mesh0` route 행·`_cmp_post`/`bd_post` mq·CSV 열), `esl/doe/step_graph.py`(mesh0 `route`·`quality`·mq 경고), `esl/doe/report_doe.py`(한계 절 1줄), `resources/doe_messages.json`(§8 코드), `backend/esl_platform/core/config.py`(`BeadDoeShapeRulesCfg`·하위 Cfg), `config/esl_platform.example.yaml`·`config/esl_platform.prod.example.yaml`, `backend/esl_platform/api/services/doe.py`(스냅샷·inputs·복제·settings), `backend/esl_platform/api/services/doe_select.py`(`range_guard.json` 읽기·캐시 키·`shape_rules` 전달·`GRAPH_ROW_KEYS`), `backend/esl_platform/api/schemas.py`, `docs/contracts/openapi_p1b.json`, `worker/esl_worker/doe_jobs.py`(결과 키 통과); 시험 `tests/doe/test_transfer_plan.py`(추가)·신규 `tests/doe/test_shape_rules_modes.py`·`backend/tests/test_doe_shape_rules_api.py`·`worker/tests/test_doe_shape_rules_jobs.py` | `packages/beadgraph/**`, impl-geom 소유 파일, `frontend/**`, `evaluate.py`·`rank.py`·`load_transfer.py`·`stiffness_metric.py`·`mesh_gmsh.py`·`mesh_refine.py`(변경 금지 — 직행은 기존 `run_isolated`·`stage_cap` 호출만) | V-SH-11~15 |
 | **impl-frontend**(화면) | `frontend/src/api/types.ts`·`frontend/src/api/doe.ts`(필드·§8 문구 맵·정보 집합), `frontend/src/components/DoeParamTable.tsx`·`SegmentTree.tsx`·`BeadList.tsx`·`DoeRanking.tsx`·`DoeInputs.tsx`, `frontend/src/pages/doe/DoeStudy.tsx`, 목 `frontend/src/mock/graphmock.ts`·`doedata.ts`·`server.ts`, 신규 `frontend/src/__tests__/doe_shape_rules.test.tsx` | 프런트 밖 전부 | V-SH-16 |
 | 통합(lead) | 이 문서, `docs/decisions.md`(SH 결정 등록), `CHANGELOG.md`, `VERSION`, `docs/manual/*`(형상 규칙 안내), 기존 계약 상호참조 줄 | – | V-SH-14 실행·V-SH-R1 안내 |
 
@@ -408,3 +413,13 @@ bead_doe:
 | Q-SH-1 | 범위 자동 축소의 품질 기준 강도 | (A) **표준** = 뒤집힘 0 + 새 야코비안 < 0.3 없음 + 새 tria 최소각 < 10° 없음 + 넓이 비 ≥ 0.2 / (B) 엄격 = A + `compare.quality` 기준 새 Fail 0(`max_new_fail_ratio` 0 근처) / (C) 뒤집힘만(지금 W 줄임을 D 까지 넓힘) | **A** — 뒤집힘 직전의 찌그러짐까지 미리 거르되, HyperMesh Fail 기준(jac 0.6 등)으로 막으면 거친 기준 메시에서 범위가 크게 줄어 DOE 가 무의미해짐. 안 판정(품질 = 경고만, D-0.16-P2)과도 어긋나지 않음 |
 | Q-SH-2 | cad 를 건너뛰고 완화 메싱으로 바로 갈 STEP 크기 | (A) **면 ≥ 1500** / (B) 면 ≥ 1000(지금 '대형 모델' 기준과 같음) / (C) 면 ≥ 2500 | **A** — 서버 실측 2800 면·합성 1915 면(cad 438 s 실패)을 모두 포함하고, 1000~1500 면 모델의 cad 성공 가능성(품질이 더 좋음)은 남김. 숫자는 설정이라 현장 측정 뒤 바꾸기 쉬움 |
 | Q-SH-3 | 메시 품질 미달(Fail > 10 % 또는 tria > 15 %) 형상·기준 메시의 순위 처리 | (A) **경고만** — 순위 유지 + 행 ⚠ + "품질 통과 최상위" 1줄 / (B) 품질 미달 형상을 순위에서 빼고 따로 표시 | **A** — 지금까지 품질은 막지 않는 원칙(SC-D-13·D-0.16-P2·D-0.16.1-Q1)과 같고, 큰 모델은 완화 메싱이 유일한 성공 경로라 빼면 비교 자체가 사라짐 |
+
+## 14. 구현 반영(통합 2026-11-16 — 계약과 다르게/보탠 점)
+
+| ID | 내용 | 근거 |
+|---|---|---|
+| SH-28 | limited 인데 usable 끝이 공칭에 붙으면 blocked(`RG_VAR_BLOCKED`, `use_default: false`) — §4.4 | V-SH-10(새 범위 LHS 에 `RG_OUTSIDE_GUARD` 0) |
+| SH-29 | 선택 키워드 추가(안정 시그니처 호환): `single(min_keep_frac=)`·`combo(max_group=)`·`guard_probe(base=)`(+ `guard_base`), ok_fn 4번째 값 n(위반 요소 수 → `ends[].n`) — §2.3 | 묶음 상한·막힘 판정을 코어 한 곳에서, 공칭 계산 재사용 |
+| SH-30 | 기저 지지 없음 = `skipped short`, `BG_SEGMENT_SHORT` 라도 기저가 있으면 점검 — §4.4 | V-SH-9(w_clamp 와 같은 후보) |
+| SH-31 | BD_LOADS 점검은 seed 가 정해진 뒤: ③ seed = `_sel_auto_step` 의 `auto_selection.json` 선택(영역 밖 제외·`fixed_user` 포함), ①② = 코어 `auto_seed`. 고정 노드 = derive 와 같은 `_sel_fixed_ids`(표 `fixed_sha256` 이 BD_MATRIX·API derive 와 일치) | V-SH-12(③ seed 변수 unchecked 0) |
+| SH-32 | 접점 직접 호출(시그니처 필터 `_kwcall`·모듈 없음 대체 `_mroute` 제거). `RG_FAILED` = 점검 계산 중 실제 예외일 때만. 준비·행렬 정보는 코어 `guard_info`(RG_BUDGET·RG_COMBO_SKIPPED)·`guard_result`, 셀 경고는 코어 `outside_guard` | V-SH-12 `test_interface_signatures_bind` |

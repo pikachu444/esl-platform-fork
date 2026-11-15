@@ -294,7 +294,7 @@ def test_step_seed_table_matches_matrix(tmp_path, core):
     run("bd_mesh0")
     r = run("bd_loads")
     assert r["graph"]["ok"] and not any(str(w).startswith("RG_FAILED") for w in r["warnings"]), r["warnings"]
-    a_, kw, doc = core.last("range_guard_table")
+    a_, kw, _doc = core.last("range_guard_table")
     auto = json.loads((out / "prep" / "select" / "auto_selection.json").read_text(encoding="utf-8"))
     assert kw["seed"] == auto["selection"] and "fixed_user" in kw["seed"]
     assert len(a_[3]) == 0                                   # ③ derive 고정 = _sel_fixed_ids(빈) — 이전 고정은 seed fixed_user

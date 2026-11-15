@@ -44,8 +44,8 @@ from esl.doe import stiffness_metric as smm
 from esl.doe import transfer_plan as tp
 from esl.errors import EslError
 from esl.fsutil import atomic_replace
-from esl.mesh import route as mroute
 from esl.library import _util as U
+from esl.mesh import route as mroute
 
 STAGES = ("bd_input", "bd_mesh0", "bd_loads", "bd_matrix", "bd_eval", "bd_post", "bd_select_grid")
 BASELINE = "d000"
