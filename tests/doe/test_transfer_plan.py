@@ -111,3 +111,78 @@ def test_plan_sm_columns():
     assert (w["fail_dist_mm"], w["fail_frac"]) == (20.0, 0.2)
     src = inspect.getsource(stg._sm_eval)
     assert "c.scn" not in src and "BASELINE" in src                                # 계획 열만 — did 분기는 참조 생성 1회뿐
+
+
+# ---------------------------------------------------------------- v0.21.0 BEAD_SHAPE(esl_bead_shape_v021.md V-SH-11)
+def test_shape_plan_columns_and_resolve():
+    """V-SH-11: 5행의 bs_wpart·bs_guard·bs_route·bs_mq = §2.2 표, 빈 칸·잘못된 값 → CONFIG_INVALID, PLAN_VERSION 1 그대로·hash_view
+    불변, resolve_shape(None) = None, 잘못된 블록 → CONFIG_INVALID, shape_hash_view 에 budget 없음, stages 는 열만(시나리오 분기 없음)."""
+    want = {"case_once": ("graph", "basis", "none", "none"), "bmesh_once": ("graph", "basis", "none", "none"),
+            "step_once": ("graph", "basis", "base", "base"), "step_per_design": ("none", "none", "none", "none"),
+            "compare_per_shape": ("none", "none", "shapes", "shapes")}
+    for pid, row in want.items():
+        assert tuple(tp.PLANS[pid][k] for k in ("bs_wpart", "bs_guard", "bs_route", "bs_mq")) == row, pid
+    assert tp.plan_for("select", "case")["bs_guard"] == "basis" and tp.plan_for("compare")["bs_route"] == "shapes"
+    assert tp.PLAN_COLS[-4:] == ("bs_wpart", "bs_guard", "bs_route", "bs_mq")
+    for col in ("bs_wpart", "bs_guard", "bs_route", "bs_mq"):
+        saved = dict(tp.PLANS["step_once"])
+        try:
+            tp.PLANS["step_once"][col] = ""
+            with pytest.raises(EslError) as ei:
+                tp.plan_for("select", "step")
+            assert ei.value.code == "CONFIG_INVALID"
+            tp.PLANS["step_once"][col] = "bogus"
+            with pytest.raises(EslError) as ei:
+                tp.plan_for("select", "step")
+            assert ei.value.code == "CONFIG_INVALID"
+        finally:
+            tp.PLANS["step_once"] = saved
+    # PLAN_VERSION·hash_view 불변(하중 전달 해시 — 옛 스냅샷 해시가 바뀌지 않음)
+    assert tp.PLAN_VERSION == 1
+    lt = tp.resolve({"method": "work"}, "select")
+    assert tp.hash_view(lt)["plan_version"] == 1 and set(tp.hash_view(lt)) == {"method", "cell_size_mm", "work", "plan_version"}
+    # resolve_shape
+    assert tp.resolve_shape(None) is None
+    r = tp.resolve_shape({"schema": 1})
+    assert r["schema"] == 1 and r["w_partial"] is True and r["range_guard"]["flip_deg"] == DEFAULTS["select"]["quality"]["flip_deg"]
+    assert r["mesh_route"]["rank_quality"]["tria_pct"] == DEFAULTS["compare"]["quality"]["tria_pct"]["fail"]   # null → 15
+    assert tp.resolve_shape(r) == r                                                 # 스냅샷 재해석 = 같은 값(멱등)
+    assert tp.resolve_shape(dict(DEFAULTS["shape_rules"], enabled=False)) is None    # 설정 꺼짐 = 키 없음
+    off = tp.resolve_shape({"range_guard": {"enabled": False}})
+    assert off["range_guard"] is None and tp.shape_hash_view(off)["range_guard"] is None
+    assert tp.resolve_shape({"range_guard": None})["range_guard"] is None             # 스냅샷의 꺼진 guard
+    f = tp.resolve_shape({}, flip_deg=45.0)
+    assert f["range_guard"]["flip_deg"] == 45.0
+    for bad in ({"w_partial": 1}, {"range_guard": {"jac_min": 1.0}}, {"range_guard": {"jac_min": 0}},
+                {"range_guard": {"tria_angle_min_deg": 60}}, {"range_guard": {"area_ratio_min": 1}},
+                {"range_guard": {"max_new_fail_ratio": 0}}, {"range_guard": {"steps": 0}}, {"range_guard": {"steps": 21}},
+                {"range_guard": {"min_keep_frac": 1.0}}, {"range_guard": {"combo": {"full_max_vars": 9}}},
+                {"range_guard": {"combo": {"samples": 0}}}, {"range_guard": {"combo": {"max_group": 1}}},
+                {"range_guard": {"budget": {"prep_timeout_s": 0}}}, {"range_guard": {"budget": {"max_evals": 0}}},
+                {"range_guard": {"budget": {"max_vars": 2001}}},
+                {"mesh_route": {"relaxed_direct": {"min_faces": 0}}}, {"mesh_route": {"relaxed_direct": {"min_step_mb": 0}}},
+                {"mesh_route": {"rank_quality": {"fail_ratio": 0}}}, {"mesh_route": {"rank_quality": {"tria_pct": 101}}}, "x"):
+        with pytest.raises(EslError) as ei:
+            tp.resolve_shape(bad)
+        assert ei.value.code == "CONFIG_INVALID", bad
+    ok = tp.resolve_shape({"mesh_route": {"relaxed_direct": {"min_faces": None, "min_step_mb": 5.5},
+                                          "rank_quality": {"tria_pct": 20}}})
+    assert ok["mesh_route"]["relaxed_direct"] == {"enabled": True, "min_faces": None, "min_step_mb": 5.5}
+    assert ok["mesh_route"]["rank_quality"]["tria_pct"] == 20
+    # shape_hash_view: budget 제외, 다른 판정 기준은 포함
+    hv = tp.shape_hash_view(r)
+    assert "budget" not in hv["range_guard"] and hv["range_guard"]["jac_min"] == 0.3 and hv["schema"] == 1
+    r2 = tp.resolve_shape({"range_guard": {"budget": {"prep_timeout_s": 5}}})
+    assert tp.shape_hash_view(r2) == hv
+    r3 = tp.resolve_shape({"range_guard": {"jac_min": 0.5}})
+    assert tp.shape_hash_view(r3) != hv and tp.shape_hash_view(None) is None
+
+
+def test_stages_read_shape_columns_only():
+    """SH-2: 형상 규칙 호출 쪽(stages·step_graph)은 계획 열 값만 읽고 시나리오 이름으로 분기하지 않는다(코드 검사)."""
+    for fn in (stg._route_of, stg._bs, stg._cmp_mq_flags, stg._cmp_mq_rank, stg._sel_mq_base, stg._sel_range_guard,
+               stg._sel_guard_selection, stg._guard_rows):
+        src = inspect.getsource(fn)
+        assert not re.search(r"c\.scn\b|scenario\s*==|select_base\(", src), fn.__name__
+    assert "bs_route" in inspect.getsource(stg._route_of) and "bs_mq" in inspect.getsource(stg._cmp_mq_rank)
+    assert 'bs_guard' in inspect.getsource(stg._sel_prepare) and 'bs_guard' in inspect.getsource(stg._sel_loads)

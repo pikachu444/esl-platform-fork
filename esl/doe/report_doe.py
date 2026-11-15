@@ -146,6 +146,27 @@ SHAPE_STATE_KO = {"READY": "실행 대상", "OK": "성공", "FAILED_MESH": "메�
                   "FAILED_SOLVE": "해석 실패", "CANCELED": "취소"}
 
 
+def mq_limit_line(mq: dict | None) -> str | None:
+    """v0.21.0 SH-24 한계 절 1줄(새 스냅샷에서 메시 품질 미달이 있을 때만): '메시 품질 미달(Fail x % · tria y %) — 순위 신뢰도 낮음,
+    품질 통과 최상위 = …'. mq = {scope shapes|base, rows[{id, name, fail_ratio, tria_pct}] | fail_ratio·tria_pct, best_clean}."""
+    if not isinstance(mq, dict):
+        return None
+    if mq.get("scope") == "base":
+        if not mq.get("warn"):
+            return None
+        fr, tp = mq.get("fail_ratio"), mq.get("tria_pct")
+        return (f"메시 품질 미달(Fail {float(fr or 0) * 100:.1f} % · tria {float(tp or 0):.1f} %) — 모든 안이 같은 메시라 순위 신뢰도가 "
+                "낮습니다(순위는 그대로)")
+    rows = [r for r in mq.get("rows") or [] if isinstance(r, dict)]
+    if not rows:
+        return None
+    fr = max(float(r.get("fail_ratio") or 0.0) for r in rows) * 100.0
+    tp = max(float(r.get("tria_pct") or 0.0) for r in rows)
+    best = mq.get("best_clean")
+    return (f"메시 품질 미달(Fail {fr:.1f} % · tria {tp:.1f} %, {len(rows)}개 형상) — 순위 신뢰도 낮음, 품질 통과 최상위 = "
+            f"{best if best else '없음'}")
+
+
 def _methods_limits(ms: dict, extra_limits: list | None = None) -> list[str]:
     if not ms:
         return []
@@ -483,7 +504,8 @@ def render_compare(ctx: dict) -> str:
     warns = [w for w in ctx.get("warnings") or [] if not str(w).startswith("COMPARE_REF_CASE_MESH")]
     if warns:
         S.append(H.section("warnings", "경고", "<ul>" + "".join(f"<li>{H.esc(w)}</li>" for w in warns) + "</ul>"))
-    S += _methods_limits(ctx.get("sources") or {}, ctx.get("limits_extra"))
+    S += _methods_limits(ctx.get("sources") or {}, list(ctx.get("limits_extra") or [])
+                         + [x for x in (mq_limit_line(ctx.get("mesh_quality")),) if x])
     title = f"강성 평가 스터디 {st.get('title') or st.get('id') or ''}".strip()
     return H.page(title, "\n".join(S), extra_css=EXTRA_CSS, version="doe")
 
@@ -699,8 +721,9 @@ def render(ctx: dict) -> str:
         inner += "<h3>출처</h3><ol>" + "".join(src) + "</ol>"
         inner += f"<p class='small muted'>자료 버전 {H.esc(ms.get('version'))}</p>"
         S.append(H.section("method", "8. 방법·출처", inner))
-        S.append(H.section("limits", "9. 한계", "<ul>" + "".join(f"<li>{H.esc(s)}</li>" for s in ms.get("limits_ko") or [])
-                           + "</ul>"))
+        S.append(H.section("limits", "9. 한계", "<ul>" + "".join(
+            f"<li>{H.esc(s)}</li>" for s in [x for x in (mq_limit_line(ctx.get("mesh_quality")),) if x]
+            + list(ms.get("limits_ko") or [])) + "</ul>"))
     title = f"강성 평가 스터디 {st.get('title') or st.get('id') or ''}".strip()
     return H.page(title, "\n".join(S), extra_css=EXTRA_CSS, version="doe")
 

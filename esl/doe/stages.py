@@ -45,6 +45,7 @@ from esl.doe import transfer_plan as tp
 from esl.errors import EslError
 from esl.fsutil import atomic_replace
 from esl.library import _util as U
+from esl.mesh import route as mroute
 
 STAGES = ("bd_input", "bd_mesh0", "bd_loads", "bd_matrix", "bd_eval", "bd_post", "bd_select_grid")
 BASELINE = "d000"
@@ -476,6 +477,10 @@ def bd_matrix(spec: dict, echo=print) -> dict:
                    basis_sha256=sel_doc["rev_doc"]["basis_sha256"])
         out["files"].append(f"{d}/{SEL_REV_JSON}")
         out["warnings"] += sel_doc["warnings"]
+        if sel_doc.get("range_guard"):           # v0.21.0 SH-18: 작업 결과 range_guard{…}(새 스냅샷만)
+            out["range_guard"] = sel_doc["range_guard"]
+        if sel_doc.get("info"):
+            out["info"] = list(sel_doc["info"])
         bj = U.read_json(os.path.join(_sel_dir(c, sel_doc["rev_doc"]["selection_sha256"]), "basis.json"))
         if bj.get("graph_vars"):                 # v0.17.0 BG-D-24 사용자 범위 > 기본 범위 → BG_RAMP_SHORT(경고, 실행 계속)
             rs = _bgr().ramp_short(bj["graph_vars"], m["spec"]["params"], c.cfg)
@@ -1004,8 +1009,15 @@ def bd_post(spec: dict, echo=print) -> dict:
            "view3d": v3, "best": None if not best_ids else {"id": best_ids[0], "files": best_files[best_ids[0]]},
            "best_all": [{"id": i, "files": best_files[i]} for i in best_ids], "noise_floor": noise,
            "matrix_sha256": m["matrix_sha256"], "warnings": warns}
+    mqb = None
     if c.scn == "select":
         out["summary"] = {"best_clean": best_clean}
+        mqb = _sel_mq_base(c, inp)               # v0.21.0 SH-23(계획 열 bs_mq = base, ③ 새 스냅샷만): 모든 안이 같은 메시 → 결과 경고 1건
+        if mqb is not None:
+            out["summary"]["mesh_quality"] = mqb["summary"]
+            if mqb["warning"] is not None:
+                warns.append(mqb["warning"]["message"])
+                out["warnings"] = [mqb["warning"] if w is mqb["warning"]["message"] else w for w in warns]
     ms = load_method_sources()
     pjson = c.p("prep", "plan.json")
     cnt = {"ok": 0, "collision": 0, "fixed": 0, "geom": 0}
@@ -1036,6 +1048,8 @@ def bd_post(spec: dict, echo=print) -> dict:
     if c.scn == "select":
         ctx["selection"] = _sel_report(c, results)
         ctx["selection"]["best_clean"] = best_clean
+        if mqb is not None:                      # v0.21.0 SH-24 보고서 한계 절 1줄 자료(③ 새 스냅샷만)
+            ctx["mesh_quality"] = {"scope": "base", **mqb["summary"]}
     if S_ is not None:                           # v0.20.0 SM-7 보고서 강성 지표 절·한계 안내, §6 최상위 metric·lin_form
         ctx["stiffness"] = dict(S_)
         out.update(metric=R.get("metric"), lin_form=R.get("lin_form"), C_ref_solve=R.get("C_ref_solve"),
@@ -1196,9 +1210,10 @@ def _cmp_input_mesh(c: Ctx, did: str, s: dict) -> dict:
             "size_mb": round(sum(f["size"] for f in files) / (1024 * 1024), 3)}
 
 
-def _cmp_text(code: str, **kw) -> str:
-    """'CODE: 문구'(resources/doe_messages.json 틀 — 자리 표시자 누락은 그대로 둠)."""
+def _cmp_text(_code: str, /, **kw) -> str:
+    """'CODE: 문구'(resources/doe_messages.json 틀 — 자리 표시자 누락은 그대로 둠). 코드는 위치 전용(틀의 {code} 자리 표시자 키워드와 충돌 없음)."""
     from esl.doe import load_messages
+    code = _code
     try:
         tpl = str(load_messages()["messages"].get(code) or code)
     except Exception:                                       # noqa: BLE001 - 문구 누락으로 실패하지 않음
@@ -1419,10 +1434,44 @@ def _md(mesh_dir: str | None) -> dict:
     return {"mesh_dir": mesh_dir} if mesh_dir else {}
 
 
+DIRECT_SKIP_STAGES = ("refine_local", "refine_global")      # v0.21.0 SH-20: 직행 실패 뒤 사다리에서 건너뜀(실패 면 기록 없음)
+
+
+def _route_of(c: Ctx, row: dict, ccfg: dict, mode: str) -> dict | None:
+    """v0.21.0 SH-19: 계획 열 bs_route ∈ {base, shapes} ∧ 메시 모드 auto·cad ∧ STEP 행 → ``route.choose`` 결과(경로 cad|cad_relaxed,
+    근거). 그 밖(옛 스냅샷·mesh 형상·freeform·remesh) = None — 지금 경로 그대로. STEP 면 수는 gmsh 없이 본문 세기."""
+    if _bs(c, "bs_route") == "none" or row.get("source") == "mesh" or mode not in ("auto", "cad"):
+        return None
+    src = c.p(row["rel"])
+    try:
+        n_faces = mg.step_scan(src, ())["n_faces"]
+        step_mb = os.path.getsize(src) / 1048576.0
+    except OSError:
+        return None
+    rx = (ccfg.get("mesh") or {}).get("cad_relaxed") or {}
+    rule = _shape(c)["mesh_route"]["relaxed_direct"]
+    return mroute.choose(n_faces, step_mb, rule, relaxed_enabled=bool(rx.get("enabled")))
+
+
+def _route_row(rt: dict) -> dict:
+    """형상 행·③ 메시 기록 route{path, reason, n_faces, min_faces}(§7)."""
+    return {k: rt.get(k) for k in ("path", "reason", "n_faces", "min_faces")}
+
+
 def _cmp_mesh_shape(c: Ctx, row: dict, h: float, ccfg: dict, props: dict, mode: str, lad: list[str],
                     remesh_ok: bool, avail: int | None, mesh_dir: str | None = None) -> dict:
     """BD_MESH0 ④ 형상 1개 분기(§7): mesh → 메시 입력(in-process), cad → 기존 그대로, remesh → 재메시, auto → cad 를 기존
-    경로로 먼저(성공이면 v0.15.x 와 바이트 동일) 실패하면 사다리(C2-D-18) — 시도 폴더 mesh/try_<n>/, 성공본을 mesh/ 로."""
+    경로로 먼저(성공이면 v0.15.x 와 바이트 동일) 실패하면 사다리(C2-D-18) — 시도 폴더 mesh/try_<n>/, 성공본을 mesh/ 로.
+    v0.21.0 SH-19~21: 새 스냅샷 ∧ 계획 열 bs_route 가 있으면 STEP 크기로 cad_relaxed 직행 여부를 먼저 정함(행 += route)."""
+    rt = _route_of(c, row, ccfg, mode)
+    r = _cmp_mesh_shape_run(c, row, h, ccfg, props, mode, lad, remesh_ok, avail, mesh_dir, rt)
+    if rt is not None:
+        r["route"] = _route_row(rt)
+    return r
+
+
+def _cmp_mesh_shape_run(c: Ctx, row: dict, h: float, ccfg: dict, props: dict, mode: str, lad: list[str],
+                        remesh_ok: bool, avail: int | None, mesh_dir: str | None, rt: dict | None) -> dict:
     if row.get("source") == "mesh":
         return _cmp_mesh_input_one(c, row, ccfg, props)
     d = mesh_dir or _cmp_mesh_dir(c, row["id"])           # v0.18.0 SG-D-5(③ step = prep/mesh0)
@@ -1440,6 +1489,10 @@ def _cmp_mesh_shape(c: Ctx, row: dict, h: float, ccfg: dict, props: dict, mode: 
     t0 = time.monotonic()
     auto = mode == "auto" and len(lad) > 1
     lg = mg.large_model(c.p(row["rel"]), ccfg["mesh"])   # v0.17.4 C2-D-33 대형 모델(STEP 본문 세기 — 결과와 무관)
+    if rt is not None and rt.get("path") == "cad_relaxed":     # v0.21.0 SH-20: cad 세션을 띄우지 않고 완화 메싱 직행
+        out = _cmp_relaxed_direct(c, row, h, ccfg, props, mode, lad, remesh_ok, avail, mesh_dir, lg)
+        if out is not None:
+            return out
     to = None
     if auto:                                            # 사다리 시간 예산(refine.total_timeout_s)은 cad 시도부터 셈
         from esl.doe import mesh_refine as mr           # v0.16.3 C2-D-29: cad 도 자기 몫까지만(뒤 단계 몫 예약)
@@ -1513,6 +1566,74 @@ def _cmp_relaxed_only(c: Ctx, row: dict, h: float, ccfg: dict, props: dict, r0: 
     return out
 
 
+def _cmp_relaxed_direct(c: Ctx, row: dict, h: float, ccfg: dict, props: dict, mode: str, lad: list[str], remesh_ok: bool,
+                        avail: int | None, mesh_dir: str | None, lg: dict) -> dict | None:
+    """v0.21.0 SH-20 큰 모델 직행: cad 세션 없이 ``_cmp_relaxed_parent`` 와 같은 하위 프로세스 1회(isolate — 같은 cad_relaxed 설정,
+    direct) — 제한 = min(cad_relaxed.timeout_s(null = mesh.timeout_s), stage_cap(누적 0)). 성공 → READY 행(mesh_method cad, mesh_path
+    cad_relaxed, cad_relaxed.direct, attempts [cad SKIPPED relaxed_direct, cad_relaxed READY]). 실패: auto → 사다리를 cad·refine_local·
+    refine_global 을 뺀 나머지로 계속(시간 예산은 직행 시도부터 누적), mode cad → 실패 행(``_cmp_relaxed_only`` 실패와 같은 꼴).
+    제한 시간이 최소 시도 시간보다 짧으면 None(지금 경로로)."""
+    from esl.doe import mesh_refine as mr
+    did = row["id"]
+    d = mesh_dir or _cmp_mesh_dir(c, did)
+    auto = mode == "auto" and len(lad) > 1
+    lad2 = [x for x in lad if x not in DIRECT_SKIP_STAGES]
+    cap = mr.stage_cap("cad_relaxed", lad2[1:] if auto else [], ccfg, 0.0)
+    rxt = ccfg["mesh"]["cad_relaxed"].get("timeout_s")
+    tmo = min(mr.attempt_timeout(float(rxt if rxt is not None else ccfg["mesh"]["timeout_s"]), ccfg, 0.0), cap)
+    if tmo < mr.min_attempt_s(ccfg):
+        return None
+    keep = _keep_tries(ccfg)
+    rx = dict(ccfg["mesh"]["cad_relaxed"], direct=True)
+    rx.pop("defer", None)
+    cfg_r = dict(ccfg)
+    cfg_r["mesh"] = dict(ccfg["mesh"], cad_relaxed=rx)
+    attempts = [{"stage": "cad", "factor": None, "h_mm": h, "status": "SKIPPED", "code": None, "seconds": None,
+                 "skipped": True, "reason": "relaxed_direct"}]
+    infos: list[str] = []
+    _cmp_say(c, f"[{did} {row['name']}] 큰 모델 — cad 없이 cad_relaxed 직행(제한 {tmo:.0f} s)")
+    c.writer.makedirs(d)
+    td = _next_try(c, d, 1, keep)
+    t1 = time.monotonic()
+    kw = {"large": True} if lg.get("large") else {}
+    try:
+        mesh, meta = mg.run_isolated(c.p(row["rel"]), td, h, cfg_r, props, opt_cfg=c.ocfg, timeout_s=tmo, **kw,
+                                     **_cmp_beat(c, row, "cad_relaxed"))
+    except EslError as exc:
+        if exc.code == "GMSH_UNAVAILABLE":
+            raise
+        dt = time.monotonic() - t1
+        code = _cad_code(td)
+        attempts.append({"stage": "cad_relaxed", "factor": None, "h_mm": h, "status": "FAILED_MESH", "code": code,
+                         "seconds": round(dt, 3), **({"timed_out": True} if mr.timed_out(exc.message) else {})})
+        infos.append(f"MESH_CAD_RELAXED_FAILED: {did} {row['name']} — {exc.message[:300]}")
+        err = {"code": code, "message": exc.message}
+        lgr = {"large": {k: lg.get(k) for k in ("reason", "n_faces", "periodic")}} if lg.get("large") else {}
+        if not auto or len(lad2) <= 1:                  # mode cad(또는 뒤 단계 없음): 직행 실패 = 형상 실패 행
+            return {"id": did, "status": "FAILED_MESH", "code": code, "message": exc.message, "attempts": attempts,
+                    "stage_times": mr.stage_times(attempts), "info": infos, "seconds": round(dt, 3), **lgr}
+        attempts += [{"stage": x, "factor": None, "h_mm": h, "status": "SKIPPED", "code": None, "seconds": None,
+                      "skipped": True, "reason": "relaxed_direct"} for x in lad if x in DIRECT_SKIP_STAGES]
+        out = _cmp_ladder(c, row, h, ccfg, props, lad2, None, dt, remesh_ok, avail, lg=lg, **_md(mesh_dir),
+                          direct={"err": err, "attempts": attempts, "infos": infos})
+        if lg.get("large"):
+            out["large"] = lgr["large"]
+        return out
+    dt = time.monotonic() - t1
+    attempts.append({"stage": "cad_relaxed", "factor": None, "h_mm": h, "status": "READY", "code": None,
+                     "seconds": round(dt, 3), "n_elems": int(meta["n_elems"])})
+    out = _cmp_ready(c, did, mesh, meta)
+    out.update(mesh_method="cad", info=infos,
+               cad_relaxed=dict(out.get("cad_relaxed") or {}, direct=True, isolated=True))
+    _cmp_relaxed_row(out, dt, lg, attempts=attempts)
+    out["seconds"] = round(dt, 3)
+    _promote(c, td, d, {"cad_relaxed": dict(meta.get("cad_relaxed") or {}, **out["cad_relaxed"]),
+                        "stage_times": out["stage_times"]})
+    if not keep:
+        _clear_tries(c, d)
+    return out
+
+
 def _relaxed_cad_attempts(pm: dict, r0: dict, h: float, t_cad: float) -> list[dict]:
     """cad 시도 행(+ 자식 안 cad_relaxed 행). interrupted = 자식 감시 타이머가 cad_relaxed 후처리 중 끊음 → 시간 초과 실패(초 =
     자식 기록, 없으면 cad 초 − 첫 세션 초) — v0.18.1 의 '0.0 s 실패' 오기록 대신(C2-D-45)."""
@@ -1557,7 +1678,8 @@ def _cmp_relaxed_row(r: dict, total_s: float, lg: dict, attempts: list | None = 
 
 
 def _cmp_ladder(c: Ctx, row: dict, h: float, ccfg: dict, props: dict, lad: list[str], r0: dict, t_cad: float,
-                remesh_ok: bool, avail: int | None, lg: dict | None = None, mesh_dir: str | None = None) -> dict:
+                remesh_ok: bool, avail: int | None, lg: dict | None = None, mesh_dir: str | None = None,
+                direct: dict | None = None) -> dict:
     """C2-D-18~22 사다리 실행기(cad 실패 뒤). 단계마다 ``mesh_refine.plan`` → 시도 직전 ``check_limits`` 재판정 →
     ``run_isolated(kind cad, size_fields·max_elems)`` 또는 재메시. 첫 성공에서 멈춤."""
     from esl.doe import mesh_refine as mr
@@ -1570,6 +1692,10 @@ def _cmp_ladder(c: Ctx, row: dict, h: float, ccfg: dict, props: dict, lad: list[
         cad_err = None
         attempts: list[dict] = []
         pm: dict = {}
+        if direct is not None:                          # v0.21.0 SH-20: cad_relaxed 직행 실패 뒤 — 직행 시도·오류를 이어받음
+            cad_err = direct["err"]
+            attempts = list(direct["attempts"])
+            infos = list(direct["infos"])
     else:
         cad_err = {"code": r0["code"], "message": r0["message"]}
         _keep_try_logs(c, d, d, "cad")                    # v0.17.4 C2-D-40 cad 로그(성공 시도가 mesh/ 로 덮기 전)
@@ -2158,6 +2284,12 @@ def _cmp_path_warn(r: dict, x: dict) -> str:
     lgt = (f" · 대형 모델(면 {lg.get('n_faces')}" + "".join(f", {k} {v}" for k, v in (lg.get("periodic") or {}).items())
            + ")") if lg else ""
     rx = x.get("cad_relaxed")
+    if rx and x.get("status") == "READY" and rx.get("direct") and (x.get("route") or {}).get("path") == "cad_relaxed":
+        fd = rx.get("fidelity") or {}               # v0.21.0 SH-21: 직행(cad 시도 없음)
+        return (f"MESH_CAD_RELAXED: {nm} 큰 모델이라 cad 없이 모델 전체를 ③ 옵션(" + ", ".join(
+            f"{k} {v}" for k, v in (rx.get("overrides") or {}).items()) + ")으로 바로 메시함(직행)"
+                + (f" — 원 STEP 대비 최대 {float(fd['hausdorff_mm']):.3f} mm" if fd.get("hausdorff_mm") is not None else "")
+                + lgt + st)
     if rx and x.get("status") == "READY":
         f = rx.get("face") or {}
         fd = rx.get("fidelity") or {}
@@ -2168,6 +2300,30 @@ def _cmp_path_warn(r: dict, x: dict) -> str:
                                        is not None else "") + lgt + st)
     path = x.get("fallback_stage") or x.get("mesh_method") or "실패"
     return f"MESH_LARGE_MODEL: {nm} 경로 {path}{lgt} — 면 폴백 세션 상한·cad 몫 줄임 적용{st}"
+
+
+def _cmp_route_infos(c: Ctx, shapes: list[dict], res: dict) -> list[str]:
+    """v0.21.0 SH-21 준비 정보 MESH_ROUTE_RELAXED{id, name, n_faces, min_faces} — 완화 직행으로 시작한 형상마다(경고 아님)."""
+    out = []
+    for r in shapes:
+        rt = (res.get(r["id"]) or {}).get("route") or {}
+        if rt.get("path") == "cad_relaxed":
+            out.append(_cmp_text("MESH_ROUTE_RELAXED", id=r["id"], name=r["name"], n_faces=rt.get("n_faces"),
+                                 min_faces=rt.get("min_faces")))
+    return out
+
+
+def _cmp_mq_flags(c: Ctx, shapes: list[dict], res: dict) -> None:
+    """v0.21.0 SH-22: 계획 열 bs_mq = shapes — 형상 행 mq{fail_ratio, tria_pct, over}(걸린 형상만, 순위 경고 근거 — compare.json 에 기록)."""
+    if _bs(c, "bs_mq") != "shapes":
+        return
+    rq = _shape(c)["mesh_route"]["rank_quality"]
+    for r in shapes:
+        x = res.get(r["id"]) or {}
+        if x.get("status") == "READY" and x.get("quality"):
+            fl = mroute.rank_flag(x["quality"], rq)
+            if fl:
+                x["mq"] = fl
 
 
 def _cmp_mesh0(c: Ctx, echo) -> dict:
@@ -2256,6 +2412,9 @@ def _cmp_mesh0(c: Ctx, echo) -> dict:
                              "profile": prof_rec, "profile_sha256": ev.config_hash(prof_rec)})
     warns = list(size_info.get("warnings") or [])
     infos = _cmp_mesh_notes(c, shapes, res, ref_mesh, h, warns)
+    if _shape(c) is not None:                           # v0.21.0 SH-21·22: 완화 직행 정보 + 메시 품질 순위 표시(새 스냅샷만)
+        infos += _cmp_route_infos(c, shapes, res)
+        _cmp_mq_flags(c, shapes, res)
     for r in shapes:
         x = res[r["id"]]
         qy = x.get("quality")
@@ -2437,6 +2596,21 @@ def _lt(c: Ctx) -> dict | None:
 
 def _lt_plan(c: Ctx) -> dict:
     return tp.plan_for(c.scn, select_base(c) if c.scn == "select" else None)
+
+
+# ---------------------------------------------------------------- v0.21.0 BEAD_SHAPE(esl_bead_shape_v021.md §2) — 계획 열만 읽음
+def _shape(c: Ctx) -> dict | None:
+    """SH-1: 스냅샷 ``doe.shape_rules`` 해석(``transfer_plan.resolve_shape``). None = 키 없음 = v0.20.0 동작(legacy). 잘못된 블록 =
+    CONFIG_INVALID. Ctx 마다 1회."""
+    if not hasattr(c, "_shape_rules"):
+        d = getattr(c, "D", None)                    # D 없는 최소 Ctx(단위 시험 스텁) = 키 없음 = legacy
+        c._shape_rules = tp.resolve_shape(d.get("shape_rules") if isinstance(d, dict) else None, getattr(c, "cfg", None))
+    return c._shape_rules
+
+
+def _bs(c: Ctx, col: str) -> str:
+    """SH-2: 계획 표 열(bs_wpart·bs_guard·bs_route·bs_mq) 값. 새 스냅샷이 아니면 none(옛 스터디). 시나리오 이름으로 분기하지 않는다."""
+    return str(_lt_plan(c)[col]) if _shape(c) is not None else "none"
 
 
 def _lt_ents(c: Ctx):
@@ -3370,8 +3544,56 @@ def _sm_apply(c: Ctx, t, did: str, mesh: dict, loads: list, region, h: float, r:
     return warns
 
 
+MQ_CSV_COLS = ["mq_fail_ratio", "mq_tria_pct"]       # v0.21.0 SH-23 끝 열(새 스냅샷만)
+
+
+def _sel_mq_base(c: Ctx, inp: dict) -> dict | None:
+    """③(bs_mq = base) 기준 메시 품질(prep/input.json mesh.quality — step_graph.mesh0 기록) → {summary{fail_ratio, tria_pct, warn},
+    warning(구조화 MESH_QUALITY_RANK{scope base, fail_ratio, tria_pct} | None)}. 품질 기록 없음(옛 코어)·해당 없음 = None."""
+    if _bs(c, "bs_mq") != "base":
+        return None
+    q = (inp.get("mesh") or {}).get("quality")
+    if not isinstance(q, dict) or q.get("fail_ratio") is None:
+        return None
+    fl = mroute.rank_flag(q, _shape(c)["mesh_route"]["rank_quality"])
+    summ = {"fail_ratio": q["fail_ratio"], "tria_pct": q.get("tria_pct"), "warn": fl is not None}
+    warning = None
+    if fl is not None:
+        msg = _cmp_text("MESH_QUALITY_RANK", fail_ratio=f"{float(q['fail_ratio']) * 100:.1f} %",
+                        tria_pct=f"{float(q.get('tria_pct') or 0.0):.1f}")
+        warning = {"code": "MESH_QUALITY_RANK", "message": msg, "scope": "base", "fail_ratio": q["fail_ratio"],
+                   "tria_pct": q.get("tria_pct")}
+    return {"summary": summ, "warning": warning}
+
+
+def _cmp_mq_rank(c: Ctx, R: dict, shapes: dict) -> dict | None:
+    """v0.21.0 SH-22·23(계획 열 bs_mq = shapes, 새 스냅샷만): compare.json 형상 행 mq(메시 품질 미달) → 순위 행 mq{fail_ratio,
+    tria_pct} + 행 warn += MESH_QUALITY_RANK(순위 그대로), 결과 경고 {scope shapes, n, shapes[{id, name, fail_ratio, tria_pct}]}(기준
+    d000 포함), summary.best_clean_mq = 품질 경고 없는 최상위 형상 id(없으면 None). 해당 없음 = None."""
+    if _bs(c, "bs_mq") != "shapes":
+        return None
+    rows = []
+    for x in R["ranking"]:
+        fl = (shapes.get(x["id"]) or {}).get("mq")
+        if isinstance(fl, dict):
+            x["mq"] = {"fail_ratio": fl["fail_ratio"], "tria_pct": fl["tria_pct"]}
+            x["warn"] = list(x.get("warn") or []) + ["MESH_QUALITY_RANK"]
+            rows.append({"id": x["id"], "name": (shapes.get(x["id"]) or {}).get("name"), **x["mq"]})
+    b = (shapes.get(BASELINE) or {}).get("mq")
+    if isinstance(b, dict):
+        rows.insert(0, {"id": BASELINE, "name": (shapes.get(BASELINE) or {}).get("name"),
+                        "fail_ratio": b["fail_ratio"], "tria_pct": b["tria_pct"]})
+    warning = None
+    if rows:
+        msg = _cmp_text("MESH_QUALITY_RANK", fail_ratio=f"{max(r['fail_ratio'] for r in rows) * 100:.1f} %",
+                        tria_pct=f"{max(r['tria_pct'] for r in rows):.1f}")
+        warning = {"code": "MESH_QUALITY_RANK", "message": msg, "scope": "shapes", "n": len(rows), "shapes": rows}
+    best = next((x["id"] for x in R["ranking"] if "mq" not in x), None)
+    return {"rows": rows, "warning": warning, "best_clean_mq": best}
+
+
 def _cmp_ranking_csv(rank: dict, results: list[dict], shapes: dict, entry_ids: list[str], lt_cols: dict | None = None,
-                     sm_key: str | None = None) -> str:
+                     sm_key: str | None = None, mq_cols: bool = False) -> str:
     """④ ranking.csv: 변수 열 대신 name·file_name. v0.16.0 끝 열(§7·C2-D-22) = source·mesh_method·hausdorff_mm·refine_h_mm·
     elem_ratio_ref(기존 열 위치 불변). v0.20.0 LT-13 lt_cols(새 스냅샷만) = 끝 열 lt_method·lt_far_frac·lt_dM_rel·score_alt."""
     buf = io.StringIO()
@@ -3379,7 +3601,7 @@ def _cmp_ranking_csv(rank: dict, results: list[dict], shapes: dict, entry_ids: l
     mid_h = (SM_CSV_MID + [f"C_{e}" for e in entry_ids] + [f"C_solve_{e}" for e in entry_ids]) if sm_key else \
         (["score", "improvement", "worst", "umax", "epsmax"] + [f"C_{e}" for e in entry_ids])
     w.writerow(["id", "rank", "status", "name", "file_name"] + mid_h + PER_ESL_COLS + [f"ratio_{e}" for e in entry_ids]
-               + MESH_CSV_COLS + (LT_CSV_COLS if lt_cols is not None else []))
+               + MESH_CSV_COLS + (LT_CSV_COLS if lt_cols is not None else []) + (MQ_CSV_COLS if mq_cols else []))
     rr = {x["id"]: x for x in rank["ranking"]}
     for r in sorted(results, key=lambda x: x["id"]):
         x = rr.get(r["id"])
@@ -3399,8 +3621,10 @@ def _cmp_ranking_csv(rank: dict, results: list[dict], shapes: dict, entry_ids: l
         else:
             row = head + ["", "", "", "", ""]
         row = (row[:5] + _sm_csv(rank, r, x, entry_ids, sm_key)) if sm_key else (row + [C.get(e, "") for e in entry_ids])
+        mqv = (x or {}).get("mq") if mq_cols else None
         w.writerow(row + extra + _mesh_csv(sh)
-                   + ((lt_cols.get(r["id"]) or [""] * len(LT_CSV_COLS)) if lt_cols is not None else []))
+                   + ((lt_cols.get(r["id"]) or [""] * len(LT_CSV_COLS)) if lt_cols is not None else [])
+                   + (([mqv["fail_ratio"], mqv["tria_pct"]] if mqv else ["", ""]) if mq_cols else []))
     return buf.getvalue()
 
 
@@ -3579,6 +3803,7 @@ def _cmp_post(c: Ctx, echo) -> dict:
                 **({"metric": S_["metric_effective"], "lin_form": S_["lin_form"],
                     "lin_valid": float(S_["lin_valid"])} if S_ else {}))
     rk.attach_shapes(R, shapes)
+    mq_res = _cmp_mq_rank(c, R, shapes)          # v0.21.0 SH-23: 메시 품질 미달 형상 ⚠(순위 유지) — 새 스냅샷만(없으면 None)
     bias, bias_w, bias_i = _cmp_refine_bias(c, t, doc, results, float(R["ratio_tol"]), echo)     # v0.16.0 C2-D-24
     for x in R["ranking"]:
         x["shape"].update(_shape_ext(shapes.get(x["id"]) or {}, bias.get(x["id"])))
@@ -3613,7 +3838,8 @@ def _cmp_post(c: Ctx, echo) -> dict:
             lt_res, lt_cols = {**tp.public(L), "summary": [], "warnings_n": 1}, {}
     with open(c.writer.guard(c.p("post", "ranking.csv")), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(_cmp_ranking_csv(R, results, shapes, eids, lt_cols,
-                                  smm.metric_key(S_["metric_effective"], S_["lin_form"]) if S_ else None))
+                                  smm.metric_key(S_["metric_effective"], S_["lin_form"]) if S_ else None,
+                                  mq_cols=mq_res is not None))
 
     def shp(did):
         s = shapes.get(did) or {}
@@ -3628,6 +3854,8 @@ def _cmp_post(c: Ctx, echo) -> dict:
         warns.append(f"COMPARE_REF_CASE_MESH: {REF_CASE_MSG}")
     warns += [w for w in doc.get("warnings") or [] if str(w).split(":", 1)[0] in MESH_HEAD_CODES] + bias_w + lt_w \
         + _sm_post_warn(S_)
+    if mq_res is not None and mq_res["warning"] is not None:      # v0.21.0 SH-23: 문자열은 작업 경고, 구조화 dict 는 결과 warnings
+        warns.append(mq_res["warning"]["message"])
     k = int(c.cfg["view3d"]["top_k"])
     top = [x["id"] for x in R["ranking"][:k]]
     v3 = []
@@ -3662,6 +3890,10 @@ def _cmp_post(c: Ctx, echo) -> dict:
            "best": None if best_id is None else {"id": best_id, "files": best_files.get(best_id, [])},
            "best_all": [{"id": i, "files": f} for i, f in sorted(best_files.items())], "noise_floor": None,
            "matrix_sha256": None, "profile": doc.get("profile"), "warnings": warns}
+    if mq_res is not None:                       # v0.21.0 SH-23: 결과 warnings 에 구조화 MESH_QUALITY_RANK, summary.best_clean_mq
+        if mq_res["warning"] is not None:
+            out["warnings"] = [mq_res["warning"] if w is mq_res["warning"]["message"] else w for w in warns]
+        out["summary"] = {"best_clean_mq": mq_res["best_clean_mq"]}
     ms = load_method_sources()
     ctx = {"study": {"id": c.D.get("id"), "title": c.D.get("title"), "scenario": "compare",
                      "created_at": c.D.get("created_at"), "entry_ids": eids},
@@ -3675,6 +3907,8 @@ def _cmp_post(c: Ctx, echo) -> dict:
            "esl": esl, "limits_extra": list(LIMIT_MSG) + _mesh_limits(doc["shapes"]), "warnings": warns,
            "refine_bias": bias, "mesh_mode": doc.get("mesh_mode"),
            "best": None if best_id is None else {"id": best_id, "files": best_files.get(best_id, [])}}
+    if mq_res is not None:                       # v0.21.0 SH-24 보고서 한계 절 1줄 자료
+        ctx["mesh_quality"] = {"scope": "shapes", "rows": mq_res["rows"], "best_clean": mq_res["best_clean_mq"]}
     if S_ is not None:                           # v0.20.0 SM-7 보고서 강성 지표 절, §6 최상위 metric·lin_form
         ctx["stiffness"] = dict(S_)
         out.update(metric=R.get("metric"), lin_form=R.get("lin_form"), C_ref_solve=R.get("C_ref_solve"),
@@ -3751,7 +3985,7 @@ def _sel_norm(c: Ctx, mesh: dict | None = None) -> tuple[dict, str]:
         if select_schema(c) != 2:
             raise EslError("SELECT_SCHEMA_MISMATCH", "schema 1 스터디에 schema 2 선택")
         graph, labels = _graph_or_none(c)                # GRAPH_FAILED: elems beads only
-        norm, sha = bgr.normalize_v2(s["input"], graph, c.cfg, labels=labels, mesh=mesh)
+        norm, sha = bgr.normalize_v2(s["input"], graph, c.cfg, labels=labels, mesh=mesh, shape_rules=_shape(c))
         if mesh is not None:
             bsel.check_elems(mesh, {"fixed_user": norm["fixed_user"], "exclude": norm["exclude"],
                                     "beads": [b for b in norm["beads"] if b["src"] == "elems"]})
@@ -3931,13 +4165,18 @@ def _sel_loads(c: Ctx, echo) -> dict:
     gst = None
     marks = None
     wall_isl = None
+    rgrec = None                                 # v0.21.0 range guard 준비 기록(새 스냅샷만)
+    rg_go = False                                # v0.21.0 SH-13: seed(③ = _sel_auto_step) 뒤에 점검
     if select_schema(c) == 2:                    # v0.17.0 BG-D-40: 분류 그래프(schema 2 만 — schema 1 은 건너뜀, 바이트 불변)
         gst = _sel_graph(c, m, gfids, sd, warns, echo, step=step)
         if gst["ok"]:
             files += [f"prep/select/{x}" for x in (bgr_files())]
-            wc = _sel_w_clamp(c, m, gfids, sd, echo)    # Verifier fix(§12 BG-X-1): 첫 행렬 전에 W 기본 범위 줄임표
-            if wc:
-                files.append(wc)
+            if _bs(c, "bs_guard") == "basis" and (_shape(c) or {}).get("range_guard"):
+                rg_go = True                     # v0.21.0 SH-13: w_clamp.json 대신 range_guard.json(아래 — seed 가 정해진 뒤)
+            else:
+                wc = _sel_w_clamp(c, m, gfids, sd, echo)    # Verifier fix(§12 BG-X-1): 첫 행렬 전에 W 기본 범위 줄임표
+                if wc:
+                    files.append(wc)
             if step and region is not None:      # v0.18.0 SG-D-20d 영역 밖 세그먼트·섬 표지
                 marks = _sel_region_marks(c, region, sd)
                 files.append(f"prep/select/{sg.REGION_JSON}")
@@ -3960,6 +4199,14 @@ def _sel_loads(c: Ctx, echo) -> dict:
         auto = _sel_auto_v2(c, m, bmeta, gst, warns, echo) if gst is not None else _sel_auto(c, m, bmeta, warns, echo)
         if auto.get("file"):
             files.append(auto["file"])
+    if rg_go:                                    # 후보 seed: ③ = _sel_auto_step 파일(영역 밖 제외·fixed_user 포함), ①② = 코어 auto_seed
+        seed = None
+        if step and auto is not None and auto.get("file"):
+            seed = U.read_json(c.p(*auto["file"].split("/"))).get("selection")
+        rgrec = _sel_range_guard(c, m, fids, sd, echo, warns, info, seed=seed,
+                                 exclude_segs=(marks or {}).get("segments") if step else None)
+        if rgrec.get("file"):
+            files.append(rgrec["file"])
     inp = U.read_json(c.p("prep", "input.json"))
     fixed_rec = {"source": "none" if fw else "scan", "n": int(fixed.sum())}
     if step:
@@ -3981,6 +4228,8 @@ def _sel_loads(c: Ctx, echo) -> dict:
         inp["graph"] = {k: v for k, v in gst.items() if k != "warnings"}
         if not gst["ok"]:                        # GRAPH_FAILED{code, message, detail} 1개(워커 준비 요약 그대로)
             inp["warnings"] += [w for w in gst.get("warnings") or [] if w.get("code") == "GRAPH_FAILED"]
+    if rgrec is not None:                        # v0.21.0 SH-18: 준비 요약(새 스냅샷만 — 키 없음 = 옛 input.json 바이트 그대로)
+        inp["range_guard"] = {k: v for k, v in rgrec.items() if k not in ("file", "warnings", "info")}
     c.write_json(os.path.join("prep", "input.json"), inp)
     if step:
         echo(f"[bd_loads] ③ 고정 이전 {fixed_rec['xfer']['method']} · 노드 {fixed_rec['n']} · 맞춤 "
@@ -3994,7 +4243,9 @@ def _sel_loads(c: Ctx, echo) -> dict:
             "boundary": None if res is None else {"n_warn": res["n_warn"], "n_info": res["n_info"]},
             "n_beads": 0, "n_params": 0, "fixed": fixed_rec,
             **({"auto": {k: v for k, v in auto.items() if k != "file"}} if auto is not None else {}),
-            **({"graph": {k: v for k, v in gst.items() if k != "warnings"}} if gst is not None else {})}
+            **({"graph": {k: v for k, v in gst.items() if k != "warnings"}} if gst is not None else {}),
+            **({"range_guard": {k: v for k, v in rgrec.items() if k not in ("file", "warnings", "info")}}
+               if rgrec is not None else {})}
 
 
 def _xfer_source(xfer: dict | None) -> str:
@@ -4117,13 +4368,49 @@ def _sel_w_clamp(c: Ctx, mesh: dict, fids, sd: str, echo) -> str | None:
     from esl.doe import bead_graph as bgr
     try:
         graph, labels = bgr.load_graph(c.p("prep"))
-        doc = bgr.w_clamp_table(mesh, graph, labels, fids, c.cfg)
+        doc = bgr.w_clamp_table(mesh, graph, labels, fids, c.cfg, shape_rules=_shape(c))   # v0.21.0: w_partial 이면 S_W 후보
     except EslError as exc:
         echo(f"[bd_loads] W 기본 범위 점검 건너뜀({exc.code})")
         return None
     bgr.write_w_clamp(os.path.join(sd, bgr.W_CLAMP_JSON), doc, guard=c.writer.guard)
     echo(f"[bd_loads] W 기본 범위 끝 뒤집힘 미리 점검: 줄일 변수 {len(doc['entries'])}")
     return f"prep/select/{bgr.W_CLAMP_JSON}"
+
+
+def _rg_info_texts(ws: list) -> list[str]:
+    """코어 정보(``bead_graph.guard_info``·guard_selection 의 D.warnings — RG_BUDGET·RG_COMBO_SKIPPED) → 'CODE: 문구'."""
+    return [_sel_text(w["code"], **{k: v for k, v in w.items() if k not in ("code", "level")}) for w in ws]
+
+
+def _sel_text(_code: str, /, **kw) -> str:
+    """'CODE: 문구'(doe_messages 틀 — 자리 표시자 누락은 그대로)."""
+    return _cmp_text(_code, **kw)
+
+
+def _sel_range_guard(c: Ctx, mesh: dict, fids, sd: str, echo, warns: list, info: list, *, seed: dict | None = None,
+                     exclude_segs=None) -> dict:
+    """v0.21.0 SH-13 BD_LOADS(계획 열 bs_guard = basis): 그래프 변수 후보의 기본 범위를 시험 모핑 + 요소 품질로 미리 점검해
+    prep/select/range_guard.json(스키마 esl/range_guard/1, scope prep) — derive(API·BD_MATRIX)가 이 표로 기본 범위·feasible 을
+    줄인다. 계산은 모드 무관 코어(``bead_graph.range_guard_table`` — esl.morph.range_guard 위). fids = derive 가 쓰는 고정 노드
+    (``_sel_fixed_ids`` — 표 fixed_sha256 이 derive 와 같아야 적용), seed = ③ seed 정규화 선택(None = 코어 auto_seed).
+    계산 중 예외가 나도 준비는 계속(경고 RG_FAILED{code} — 표 없음, derive 는 전부 unchecked, BD_MATRIX 가 받침).
+    반환 = 코어 ``guard_result``{entries, limited, blocked, combos, evals, seconds, stopped} + file(| 실패 시 failed code)."""
+    from esl.doe import bead_graph as bgr
+    t0 = time.monotonic()
+    try:
+        graph, labels = bgr.load_graph(c.p("prep"))
+        doc = bgr.range_guard_table(mesh, graph, labels, fids, c.cfg, _shape(c), seed=seed, exclude_segs=exclude_segs)
+    except Exception as exc:                      # noqa: BLE001 - 계산 실패가 준비를 막지 않음(SH-17)
+        code = str(exc.code) if isinstance(exc, EslError) else type(exc).__name__
+        echo(f"[bd_loads] 변수 범위 품질 점검 실패({code}: {str(exc)[:200]}) — 범위 축소 없이 진행")
+        warns.append(_sel_text("RG_FAILED", code=code))
+        return {"file": None, "failed": code, "seconds": round(time.monotonic() - t0, 3)}
+    bgr.write_range_guard(os.path.join(sd, bgr.RANGE_GUARD_JSON), doc, guard=c.writer.guard)
+    out = {"file": f"prep/select/{bgr.RANGE_GUARD_JSON}", **bgr.guard_result(doc, time.monotonic() - t0)}
+    info += _rg_info_texts(bgr.guard_info(doc))
+    echo(f"[bd_loads] 변수 범위 품질 점검: 점검 {out['entries']} · 줄임 {out['limited']} · 막힘 {out['blocked']} · 조합 "
+         f"{out['combos']} · 시험 모핑 {out['evals']}회 · {out['seconds']:.1f}s" + (f" · 중단({out['stopped']})" if out["stopped"] else ""))
+    return out
 
 
 def graph_failed_warning(code: str | None) -> dict:
@@ -4173,7 +4460,7 @@ def _sel_auto_v2(c: Ctx, mesh: dict, bmeta: dict, gst: dict | None, warns: list,
         out["warnings"] += aw
         warns.append("AUTO_DETECT_FAILED: step=graph code=AUTO_BEAD_UNMAPPED")
         return out
-    norm, sha = bgr.normalize_v2(sel, graph, c.cfg, labels=labels, mesh=mesh)
+    norm, sha = bgr.normalize_v2(sel, graph, c.cfg, labels=labels, mesh=mesh, shape_rules=_shape(c))   # v0.21.0 SH-4(None = 옛 규칙)
     doc = bgr.auto_doc_v2(norm, sha, sym, hints, aw, mesh_sha256=bmeta["mesh_sha256"], graph_sha=gst["sha256"],
                           **({"fixed": fixed_rec} if fixed_rec is not None else {}))
     bgr.write_auto_v2(c.p("prep", "select", ba.AUTO_SELECTION_JSON), doc, guard=c.writer.guard)
@@ -4240,7 +4527,8 @@ def _sel_prepare(c: Ctx, t, echo) -> dict:
                 bj.get("basis_sha256") == U.sha256_file(pb) and bj.get("cfg_sha256") == _sel_cfg_sha(c) and \
                 bj.get("algo", 1) == bsel.ALGO and \
                 (not v2 or (bj.get("graph_algo") == _bgr().GRAPH_ALGO and           # v0.17.0 BG-D-39 재사용 조건
-                            bj.get("morph_rules") == _bgr()._bg().MORPH_RULES)):     # 옛 규칙 기저는 1회 재계산
+                            bj.get("morph_rules") == _bgr()._bg().MORPH_RULES)) and \
+                (_shape(c) is None or bj.get("range_guard_sha256") == _prep_rg_sha(c)):   # v0.21.0: 준비 점검표가 바뀌면 다시
             echo(f"[bd_matrix] select 기저 재사용 {sha[:12]}…")
             return {"params": U.read_json(pp)["params"], "warnings": [],
                     "rev_doc": _sel_rev(c, sha, bj["basis_sha256"])}
@@ -4250,15 +4538,31 @@ def _sel_prepare(c: Ctx, t, echo) -> dict:
         raise EslError("PREVIEW_STALE", "선택의 mesh_sha256 이 준비 기준 메시와 다름(SELECTION_DROPPED)")
     if v2:                                      # v0.17.0 schema 2: 그래프 비드(+ elems 비드는 schema 1 derive, 섬 60)
         graph, labels = _graph_or_none(c)
-        D = _bgr().derive_obj_v2(t.mesh, norm, c.cfg, graph, labels, fixed_node_ids=fids, mesh_sha256=bmeta["mesh_sha256"],
-                                 w_clamp=_bgr().load_w_clamp(c.p("prep")) if graph is not None else None)
+        sr = _shape(c)
+        if sr is None:                          # v0.20.0 그대로(옛 스냅샷 — 호출·바이트 불변)
+            D = _bgr().derive_obj_v2(t.mesh, norm, c.cfg, graph, labels, fixed_node_ids=fids,
+                                     mesh_sha256=bmeta["mesh_sha256"],
+                                     w_clamp=_bgr().load_w_clamp(c.p("prep")) if graph is not None else None)
+        else:                                   # v0.21.0 SH-13: 새 스냅샷 = range_guard 표(w_clamp.json 안 씀)
+            D = _bgr().derive_obj_v2(t.mesh, norm, c.cfg, graph, labels, fixed_node_ids=fids,
+                                     mesh_sha256=bmeta["mesh_sha256"], shape_rules=sr,
+                                     range_guard=(_bgr().load_range_guard(c.p("prep"))
+                                                  if graph is not None and _bs(c, "bs_guard") == "basis" else None),
+                                     w_clamp=(_bgr().load_w_clamp(c.p("prep"))
+                                              if graph is not None and not sr.get("range_guard") else None))
     else:
         D = bsel.derive_obj(t.mesh, norm, c.cfg, fixed_node_ids=fids, mesh_sha256=bmeta["mesh_sha256"],
                             with_section=False)
     B = bsel.basis(t.mesh, D, c.cfg)
-    rc_w = bsel.range_check(t.mesh, D, B, c.cfg)   # v0.16.1 SR-D-33: 기본 범위 끝 뒤집힘 → 비드 경고(범위·기저 불변)
-    if v2:                                      # 통합 v0.17.0(BG-X-1): 그래프 W 기본 범위 = usable 로 줄임 + 정보 BG_RANGE_CLAMPED
-        _bgr().clamp_w_ranges(D, rc_w)
+    sr_g = _shape(c) if v2 else None
+    rgd = None                                  # v0.21.0 select/<sha12>/range_guard.json 문서(새 스냅샷·guard 켬일 때만)
+    if sr_g is not None and sr_g.get("range_guard") and _bs(c, "bs_guard") == "basis":
+        rgd = _sel_guard_selection(c, t, D, B, echo)                     # SH-13: 보충 점검 + elems 변수 range_check 만
+        rc_w = rgd["rc_w"]
+    else:
+        rc_w = bsel.range_check(t.mesh, D, B, c.cfg)   # v0.16.1 SR-D-33: 기본 범위 끝 뒤집힘 → 비드 경고(범위·기저 불변)
+        if v2:                                  # 통합 v0.17.0(BG-X-1): 그래프 W 기본 범위 = usable 로 줄임 + 정보 BG_RANGE_CLAMPED
+            _bgr().clamp_w_ranges(D, rc_w)
     if rc_w:
         echo("[bd_matrix] 기본 범위 끝 뒤집힘: " + ", ".join(
             f"{w['var']} 기본 범위 {w['from']} → {w['to']}(뒤집힘 없는 범위로 줄임)" if w["code"] == "BG_RANGE_CLAMPED" else
@@ -4282,6 +4586,8 @@ def _sel_prepare(c: Ctx, t, echo) -> dict:
     meta = bsel.basis_meta(B, bsha)
     import hashlib
     meta.update(sha256=hashlib.sha256(blob).hexdigest(), mesh_sha256=bmeta["mesh_sha256"], cfg_sha256=_sel_cfg_sha(c))
+    if _shape(c) is not None:                   # v0.21.0: 새 스냅샷만(키 없음 = 옛 basis.json 바이트 그대로) — 준비 점검표 sha·규칙 판
+        meta.update(shape_rules=1, range_guard_sha256=_prep_rg_sha(c))
     if v2:                                      # v0.17.0 BG-D-39: 그래프 경로 판·패키지 판 + 램프(BG_RAMP_SHORT 판단)
         bg = _bgr()._bg()
         meta.update(graph_algo=_bgr().GRAPH_ALGO, morph_rules=bg.MORPH_RULES, rules_graph=bg.RULES,
@@ -4291,12 +4597,54 @@ def _sel_prepare(c: Ctx, t, echo) -> dict:
     c.write_json(os.path.relpath(pj, c.out), meta)
     warns = [f"{w['code']}: {b.id}" for b in D.beads for w in b.warnings]
     echo(f"[bd_matrix] select {sha[:12]}… 비드 {len(D.beads)} · 변수 {len(B.vars)} · 기저 sha {bsha[:12]}…")
-    return {"params": tab, "warnings": warns, "rev_doc": _sel_rev(c, sha, bsha)}
+    out = {"params": tab, "warnings": warns, "rev_doc": _sel_rev(c, sha, bsha)}
+    if rgd is not None and rgd.get("doc") is not None:       # v0.21.0 SH-13: select/<sha12>/range_guard.json(scope selection)
+        _bgr().write_range_guard(os.path.join(d, _bgr().RANGE_GUARD_JSON), rgd["doc"], guard=c.writer.guard)
+        out["range_guard"] = _bgr().guard_result(rgd["doc"], rgd["seconds"])
+        if rgd.get("info"):
+            out["info"] = list(rgd["info"])
+    return out
 
 
 def _bgr():
     from esl.doe import bead_graph as bgr
     return bgr
+
+
+def _prep_rg_sha(c: Ctx) -> str | None:
+    """prep/select/range_guard.json 바이트 sha256(없으면 None) — select 기저 재사용 판정(v0.21.0)."""
+    p = c.p("prep", "select", _bgr().RANGE_GUARD_JSON)
+    return U.sha256_file(p) if os.path.isfile(p) else None
+
+
+def _sel_guard_selection(c: Ctx, t, D, B, echo) -> dict:
+    """v0.21.0 SH-13 BD_MATRIX 보충: (1) 그래프 변수 중 준비 표에 없는 것(guard.state unchecked)만 + 선택 전체 조합을 같은 코어 함수
+    (``bead_graph.guard_selection`` — 규칙 = derive 가 D 에 둔 shape_rules)로 점검 → D 의 기본 범위에 반영(다음 행렬부터 보임 —
+    이번 행렬은 sha 고정), (2) elems 변수는 ``range_check(only=elems)``(SR-D-33 경고만, 범위 불변). 점검 중 예외가 나면 정보
+    RG_FAILED{code} 로 남기고 전부 unchecked 로 진행. 반환 {rc_w, doc|None, info[], seconds}."""
+    from esl.doe import bead_select as bsel
+    rows = bsel.params_table(D, c.cfg)
+    graph_names = [r["name"] for r in rows if "guard" in r]
+    elem_names = [r["name"] for r in rows if "guard" not in r]
+    unchecked = sorted(r["name"] for r in rows if (r.get("guard") or {}).get("state") == "unchecked")
+    doc, info = None, []
+    t0 = time.monotonic()
+    if graph_names:
+        n0 = len(D.warnings)
+        try:
+            doc = _bgr().guard_selection(t.mesh, D, B, c.cfg, only=unchecked)
+        except Exception as exc:                  # noqa: BLE001 - 계산 실패가 행렬을 막지 않음(SH-17)
+            code = str(exc.code) if isinstance(exc, EslError) else type(exc).__name__
+            echo(f"[bd_matrix] 변수 범위 품질 점검 실패({code}: {str(exc)[:200]}) — 범위 축소 없이 진행")
+            info.append(_sel_text("RG_FAILED", code=code))
+        info += _rg_info_texts([w for w in D.warnings[n0:] if isinstance(w, dict) and
+                                w.get("code") in ("RG_BUDGET", "RG_COMBO_SKIPPED")])
+    if doc is not None:
+        k = _bgr().guard_result(doc)
+        echo(f"[bd_matrix] 변수 범위 품질 점검(보충 {len(unchecked)}개): 줄임 {k['limited']} · 막힘 {k['blocked']} · 조합 "
+             f"{k['combos']} · 시험 모핑 {k['evals']}회")
+    rc_w = bsel.range_check(t.mesh, D, B, c.cfg, only=elem_names)   # elems 변수만(SR-D-33 경고 — 범위 불변)
+    return {"rc_w": rc_w, "doc": doc, "info": info, "seconds": round(time.monotonic() - t0, 3)}
 
 
 def _graph_or_none(c: Ctx):
@@ -4312,8 +4660,12 @@ def _sel_cfg_sha(c: Ctx) -> str:
     import json
 
     from esl.doe import bead_select as bsel
-    s = json.dumps({"select": bsel.select_hash_view(c.cfg["select"], step=_is_step_base(c)),
-                    "quality": c.cfg["compare"]["quality"]}, sort_keys=True, separators=(",", ":"))
+    h = {"select": bsel.select_hash_view(c.cfg["select"], step=_is_step_base(c)),
+         "quality": c.cfg["compare"]["quality"]}
+    sr = _shape(c)
+    if sr is not None:                           # v0.21.0 SH-26: 새 스냅샷만(budget 제외) — 옛 스터디 해시 불변
+        h["shape"] = tp.shape_hash_view(sr)
+    s = json.dumps(h, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
@@ -4416,6 +4768,7 @@ def bd_select_grid(spec: dict, echo=print) -> dict:
     with open(c.writer.guard(os.path.join(gd, "cells", "nominal", "thumb.png")), "wb") as fh:
         fh.write(sr.render(x0, tris, None, None, view, V, tcfg, loops=L["loops"]))
     cells = []
+    grows = _guard_rows(c)                       # v0.21.0 SH-13 셀 경고용 변수 행 guard(새 스냅샷만 — 없으면 [])
     for k, x in enumerate(designs):
         xd = bsel.morph(x0, L["B"], x["values"])
         cv = sr.color_values(x0, xd, direction, has)
@@ -4431,6 +4784,9 @@ def bd_select_grid(spec: dict, echo=print) -> dict:
                                                  "max_flip_deg", "fail_by")}}
         if st.get("warnings"):                   # v0.16.1 경고 안(READY — 실행·순위 대상, SR-D-1·11)
             cell["warnings"] = st["warnings"]
+        og = _bgr().outside_guard(grows, x["values"]) if grows else None
+        if og:                                   # v0.21.0 SH-13: 점검된 안전 범위 밖 값(경고만 — 상태·판정 불변)
+            cell["warnings"] = list(cell.get("warnings") or []) + [og]
         if st["fixed"]["violated"]:              # v0.16.1 SR-D-3: 침범 원인 = 침범이 있는 모든 칸(상태 무관)
             cell["fixed_viol"] = bsel.fixed_violation_detail(x0, xd, L["fixed"], L["B"], x["values"],
                                                              float(bsel._cfg(c.cfg)["fixed_tol_mm"]))
@@ -4451,6 +4807,18 @@ def bd_select_grid(spec: dict, echo=print) -> dict:
     c.progress(100)
     return {"files": [f"{gd_rel}/{pio.GRID_MANIFEST}".replace(os.sep, "/")], "counts": cnt,
             "selection_sha256": L["rev"]["selection_sha256"], "warnings": []}
+
+
+def _guard_rows(c: Ctx) -> list[dict]:
+    """v0.21.0: 선택 기저 폴더 params.json 의 변수 행(guard 가 있는 행만 — 셀 경고 ``bead_graph.outside_guard`` 입력). 새 스냅샷·
+    guard 켬이 아니거나 읽을 수 없으면 []."""
+    if _bs(c, "bs_guard") != "basis" or not (_shape(c) or {}).get("range_guard"):
+        return []
+    try:
+        pj = U.read_json(os.path.join(_sel_dir(c, _sel_rev_doc(c)["selection_sha256"]), "params.json"))
+    except (OSError, ValueError, EslError):
+        return []
+    return [r for r in pj.get("params") or [] if isinstance(r, dict) and isinstance(r.get("guard"), dict)]
 
 
 def _sel_rad_files(c: Ctx, nid: np.ndarray) -> list[tuple[str, str]]:

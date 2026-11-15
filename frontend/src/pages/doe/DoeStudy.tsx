@@ -855,6 +855,8 @@ function SelectVarsPlan(p: {
   beadPngUrl: (b: string) => string;
   /** v0.17.1 접기 상태 키(스터디 id) */
   foldKey?: string;
+  /** v0.21.0 스터디 스냅샷 형상 규칙(없으면 v0.20.0 화면) */
+  shapeRules?: import("../../api/types").DoeShapeRules | null;
 }) {
   const { pd, rows, form, st, plan } = p;
   const params = pd?.params ?? [];
@@ -893,6 +895,7 @@ function SelectVarsPlan(p: {
               setRows={p.setRows}
               readOnly={!p.editable}
               beadPngUrl={p.beadPngUrl}
+              shapeRules={p.shapeRules}
               select={{ blendOf: p.ctrl.blendOf, setBlend: p.ctrl.setBlend, kBlend: st.select?.blend.k ?? null, blendMax: st.select?.blend.max_mm ?? 200, active: p.activeVar, onActive: p.setActiveVar }}
             />
             <DoeSpecRow st={st} form={form} setForm={p.setForm} matrix={p.matrix} matrixError={p.matrixError} readOnly={!p.editable} k={rows.filter((r) => r.on).length} />
@@ -1275,7 +1278,7 @@ function StudyDetail({ projectId, id, st, stError }: { projectId: string; id: st
                 {isCompare
                   ? `형상 ${s.prep.n_shapes ?? s.inputs.shapes?.length ?? "?"} · 준비됨 ${s.prep.n_ready ?? "?"} · 요소 ${st?.compare?.mesh_size_mm ?? 3} mm`
                   : stepBaseSel
-                    ? `STEP 메시 ${((s.prep.n_nodes ?? 0) / 1e4).toFixed(1)}만 노드 ✓${s.prep.mesh?.method ? ` · 메시 ${meshMethodName(s.prep.mesh.method)}` : ""} · 고정: ${s.prep.fixed?.source === "a_transfer" && s.prep.fixed.n > 0 ? `A 이전 ${s.prep.fixed.n} 노드 ✓` : "없음 ⚠"}${s.prep.boundary ? ` · 경계 경고 ${s.prep.boundary.n_warn}` : ""}`
+                    ? `STEP 메시 ${((s.prep.n_nodes ?? 0) / 1e4).toFixed(1)}만 노드 ✓${s.prep.mesh?.method ? ` · 메시 ${meshMethodName(s.prep.mesh.method)}${s.prep.mesh.route?.path === "cad_relaxed" ? "(완화 직행)" : ""}` : ""} · 고정: ${s.prep.fixed?.source === "a_transfer" && s.prep.fixed.n > 0 ? `A 이전 ${s.prep.fixed.n} 노드 ✓` : "없음 ⚠"}${s.prep.boundary ? ` · 경계 경고 ${s.prep.boundary.n_warn}` : ""}`
                   : isSelect
                     ? `${meshBaseSel ? "B 메시" : "Ch/R"} ${((s.prep.n_nodes ?? 0) / 1e4).toFixed(1)}만 노드 ✓ · 고정: ${s.prep.fixed?.source === "none" || !s.prep.fixed ? "없음 ⚠" : `fixed-scan ${s.prep.fixed.n} 노드 ✓`}${meshBaseSel && s.prep.boundary ? ` · 경계 경고 ${s.prep.boundary.n_warn}` : ""}`
                     : `비드 ${s.prep.n_beads ?? "?"} · 변수 ${s.prep.n_params ?? "?"} · paicad ${s.prep.paicad_version ?? "?"}`}
@@ -1298,7 +1301,7 @@ function StudyDetail({ projectId, id, st, stError }: { projectId: string; id: st
           {warnText({ code: "SELECTION_DROPPED" })}
         </div>
       )}
-      {beadPrep && isSelect && <BeadSelectCards ctrl={ctrl} editable={editable} st={st} fixedMissing={!stepBaseSel && s?.prep?.fixed?.source === "none"} auto={autoView} stepInfo={stepInfo} />}
+      {beadPrep && isSelect && <BeadSelectCards ctrl={ctrl} editable={editable} st={st} fixedMissing={!stepBaseSel && s?.prep?.fixed?.source === "none"} auto={autoView} stepInfo={stepInfo} shapeRules={s?.inputs.shape_rules ?? null} />}
       {beadPrep && isSelect && (
         <SelectVarsPlan
           ready={!!selSha}
@@ -1321,6 +1324,7 @@ function StudyDetail({ projectId, id, st, stError }: { projectId: string; id: st
           nWarn={s?.prep?.boundary?.n_warn ?? null}
           beadPngUrl={(b) => doe.beadPngUrl(id, b)}
           foldKey={id}
+          shapeRules={s?.inputs.shape_rules ?? null}
         />
       )}
       {beadPrep && !isSelect && (
@@ -1429,16 +1433,28 @@ function StudyDetail({ projectId, id, st, stError }: { projectId: string; id: st
           <ErrorLine text={result.error} />
           {result.data && (
             <>
-              {result.data.warnings.filter((w) => w.code !== "SENSITIVITY_TOO_FEW" && w.code !== "SM_CROSS_MESH").length > 0 && (
-                <ul className="reasons small warn-text">
-                  {result.data.warnings
-                    .filter((w) => w.code !== "SENSITIVITY_TOO_FEW" && w.code !== "SM_CROSS_MESH")
-                    .map((w, i) => (
-                      <li key={i}>{warnText(w)}</li>
-                    ))}
-                </ul>
-              )}
-              <DoeRanking result={result.data} params={pd?.params ?? []} entries={entries} selected={pick} onSelect={setPick} varNames={varNames} rankCfg={st} />
+              {(() => {
+                // v0.21.0 ③ 기준 메시 품질 미달 = 결과 띠 1줄(모든 안이 같은 메시 — 행 표시 없음). 목록에서는 뺌
+                const mqBase = result.data.warnings.find((w) => w.code === "MESH_QUALITY_RANK" && w.scope === "base");
+                const rest = result.data.warnings.filter((w) => w.code !== "SENSITIVITY_TOO_FEW" && w.code !== "SM_CROSS_MESH" && w !== mqBase);
+                return (
+                  <>
+                    {mqBase && (
+                      <div className="small warn-text" data-testid="mq-base-strip">
+                        ⚠ {warnText(mqBase)}
+                      </div>
+                    )}
+                    {rest.length > 0 && (
+                      <ul className="reasons small warn-text">
+                        {rest.map((w, i) => (
+                          <li key={i}>{warnText(w)}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                );
+              })()}
+              <DoeRanking result={result.data} params={pd?.params ?? []} entries={entries} selected={pick} onSelect={setPick} varNames={varNames} rankCfg={st} shapeRules={s?.inputs.shape_rules ?? null} />
               {isLinResult(result.data) && (
                 <div className="small muted" data-testid="sm-verify-note">
                   1차 강성 지표 순위입니다(재풀이 없음) — 상위 안은 산출물로 Radioss 검증 낙하를 돌려 확인하세요.

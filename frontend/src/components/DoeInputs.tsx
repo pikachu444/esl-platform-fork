@@ -10,7 +10,7 @@ import { CODE_TEXT, errorText } from "../api/client";
 import {
   BEAD_SOURCE_NAME, DEFEATURE_KIND_NAME, diagText, doe, featureSizeText,
   MESH_METHOD_SHORT, MESH_MODE_NAME, ltKey, ltVariantLabel, SCENARIO_NAME, STATUS_NAME, STEP_EXT, defaultShapeName, meshMainCandidates, meshMethodKind, meshMethodLabel, meshMethodTip, partIdProblem, shapeFailText, shapeFailTip, shapeKindOf,
-  shapeNameProblem, warnText, isInfoWarn,
+  shapeNameProblem, warnText, isInfoWarn, routeChip,
 } from "../api/doe";
 import type { DoeBeadSource, DoeSelectBase, DoeDefeatureList, DoeCheckOut, DoeDesignStatus, DoeMeshMode, DoeMeshPart, DoePrepShape, DoeScenario, DoeSettingsOut, DoeStudyOut, EntryOut } from "../api/types";
 import { entryKey } from "./ModeSelect";
@@ -877,6 +877,14 @@ export function CompareShapeSummary({ study }: { study: DoeStudyOut }) {
                 {showMethod && (
                   <td className="doe-mm-col" data-testid={`prep-method-${r.id}`}>
                     <MeshMethodBadge shape={r} partId={partOf.get(r.id)} />
+                    {(() => {
+                      const rc = routeChip(r.route);
+                      return rc ? (
+                        <span className="badge info doe-tag" title={rc.tip} data-testid={`prep-route-${r.id}`}>
+                          {rc.label}
+                        </span>
+                      ) : null;
+                    })()}
                     {r.mesh_method === "defeature" && (
                       <button
                         type="button"

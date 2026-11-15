@@ -8,6 +8,7 @@
 - 관계: `esl_step_compare.md`(④, SC-D-*)를 **확장**합니다. 업로드·검사·정렬/크기(SC-D-7)·기준 frame 고정 셀 매핑과 `auto_supports`(SC-D-6)·물성(SC-D-8)·병렬(SC-D-9)·품질(SC-D-13 `mesh_quality.summarize`)·순위·보고서는 그대로 재사용합니다. ② B 메시 읽기 규칙(`scenario.copy_mesh_upload`, purpose `doe_mesh`)과 rad 파서(`esl/rad/parser.py`)도 재사용합니다. 이 문서에 없는 규칙은 STEP_COMPARE 를 따르고, 충돌하면 이 문서가 우선합니다.
 - 메시 기준: `docs/reference/radioss_chr_3mm_batchmesh.md`(목표 3 mm, min 2.4, quad 우선 mixed).
 - ID 규칙: 결정 `C2-D-n`, 요구 `C2-n`, 시험 `V-C2-n`, 리스크 `R-C2-n`.
+- **v0.21.0 상호참조**: 새 스냅샷(`doe.shape_rules`)에서 STEP 면 ≥ `shape_rules.mesh_route.relaxed_direct.min_faces` 인 형상은 cad 없이 cad_relaxed 로 시작(C2-D-32·45 앞 직행)하고 메시 품질 미달은 순위 경고 — `esl_bead_shape_v021.md` §5.
 
 ### 사용자 확정 (2026-11-04, 변경 금지)
 1. ④ 가 최우선이다. 복잡한 Ch/R 중립면 STEP 을 gmsh 로 메시할 때 실패가 잦다.

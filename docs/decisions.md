@@ -280,3 +280,14 @@
 - (0.20.0 요약) v0.20.0 = 하중 전달 전 모드 확장(LT-15~24)·독립 모듈·계획 표·ritz 기본·결정 A·먼 노드 규칙 개정, 목록 항목 삭제는 v0.19.0 그대로(변경 없음).
 - (0.20.0 D-0.20.0-SM-10, 2026-11-13 사용자 결정 R-SM-1, 근거: 1-벡터 Ritz 하한 C_ritz ≤ C_solve 가 큰 형상 변화에서 느슨해져 양방향 ρ > 1 → 거짓 개선 — select E2E 실측 깊이 18/26 mm ρ 3.66·2.79, ritz 0.53·0.64 vs 재풀이 1.014·0.992) metric lin 에서 |ρ−1| > `rank.lin_valid` 인 ESL 이 있는 안은 그 안의 순위 값을 재풀이 C 로 대체(행 basis solve·SM_LIN_RANGE, 나머지 basis lin, 결과 rank.n_fallback), 공용 경로 `rank.rank(lin_valid)` 한 곳·모드 분기 없음(④·옛 ③ 불변). 범위 안(ρ 1.23~1.24)의 거짓 개선은 남음 → 2-벡터 Ritz(잔차 보정) v0.20.1 후보.
 - (0.20.0 D-0.20.0-SM-11, 2026-11-13 사용자 결정) 기본 순위 지표 = 재풀이 C(`bead_doe.rank.metric` 기본 solve — DEFAULTS·pydantic·yaml 2·목업), ritz·taylor 는 사용자 선택·보조 열(score_lin·ρ·불평형), lin 선택 시 안별 재풀이 대체(SM-10) 유지. 옛 스냅샷 재시도 = 스냅샷 값 우선, metric 키 없으면 새 DEFAULTS(solve). 근거: 1-벡터 Ritz 하한은 항상 강성 과대 쪽으로 치우치며 하한을 조이면 C_solve 로 수렴 → 근본 대책 아님. 후속 v0.20.1 후보 = 재풀이 해 보정(K₁⁻¹r 의 무른 모드 성분 필터, 서버 #63 ① 기준 검증).
+
+## 2026-11-16 (v0.21.0)
+- (0.21.0 D-0.21.0-SH-1~27, 2026-11-16, 근거 서버 실측 큰 모델 cad 516 s 시간 초과 → cad_relaxed 272~280 s·Fail 55.5 %) 비드 형상 변화 개선 — W 구간별(S_W), 품질 기반 범위 제한(range guard: 준비 표 + 행렬 보충, 진단 스키마 1개), 큰 모델 cad_relaxed 직행·메시 품질 순위 경고. 모드 차이 = `transfer_plan.PLANS` 열 bs_wpart·bs_guard·bs_route·bs_mq, 공용 모듈 `esl/morph/range_guard.py`·`esl/mesh/route.py`, 설정 `bead_doe.shape_rules`(DEFAULTS·pydantic·yaml 2), 키 없는 스냅샷 = v0.20.0 바이트 동일. 계약 esl_bead_shape_v021.md.
+- (0.21.0 Q-SH-1, 2026-11-16 사용자 결정) 범위 축소 품질 기준 = A 표준(뒤집힘 0 · 새 야코비안 < 0.3 없음 · 새 tria 최소각 < 10° 없음 · 넓이 비 ≥ 0.2, max_new_fail_ratio null).
+- (0.21.0 Q-SH-2, 2026-11-16 사용자 결정) cad_relaxed 직행 기준 = STEP 면 ≥ 1500(`mesh_route.relaxed_direct.min_faces`, min_step_mb null).
+- (0.21.0 Q-SH-3, 2026-11-16 사용자 결정) 메시 품질 미달(Fail > 10 % 또는 tria > 15 %) = 경고만 — 순위 유지 + 행 ⚠ + "품질 통과 최상위" 1줄.
+- (0.21.0 SH-28, 2026-11-16 구현 반영) limited 인데 usable 끝이 공칭에 붙으면 blocked(`RG_VAR_BLOCKED`, use_default false) — V-SH-10 의 RG_OUTSIDE_GUARD 0.
+- (0.21.0 SH-29, 2026-11-16 구현 반영) 안정 시그니처에 선택 키워드 `single(min_keep_frac=)`·`combo(max_group=)`·`guard_probe(base=)` 추가(ok_fn 4번째 값 n 허용).
+- (0.21.0 SH-30, 2026-11-16 구현 반영) 기저 지지 없음 = skipped short, `BG_SEGMENT_SHORT` 라도 기저가 있으면 점검(w_clamp 와 같은 후보 — V-SH-9).
+- (0.21.0 SH-31·32, 2026-11-16 통합) BD_LOADS 점검 seed = ③ `_sel_auto_step` 선택(①② 코어 auto_seed)·고정 = derive 의 `_sel_fixed_ids`, 접점 직접 호출(`_kwcall`·`_mroute` 제거 — RG_FAILED 는 실제 예외만), `worker/esl_worker/register.py` COMPARE_SHAPE_KEYS route·mq·③ mesh.route·quality 전달은 메인 승인(계약 §12 소유 절).
+- (0.21.0 R-SH-9, 2026-11-16 미해결) H6 링 D 15개가 한 묶음 → `combo.max_group` 8 초과로 조합 점검 생략(`RG_COMBO_SKIPPED`) — 후속 묶음 분할.

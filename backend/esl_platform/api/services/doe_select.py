@@ -171,6 +171,8 @@ GRAPH_JSON = ("select", "graph.json")                       # prep/select/graph.
 GRAPH_LABELS = ("select", "graph_labels.npz")               # 요소별 int32 라벨(allow_pickle=False)
 W_CLAMP = ("select", "w_clamp.json")                         # Verifier fix v0.17.0(§12 BG-X-1): BD_LOADS W 기본 범위 줄임표
 W_CLAMP_SCHEMA = "esl/bg_w_clamp/1"
+RANGE_GUARD = ("select", "range_guard.json")                 # v0.21.0 SH-13: BD_LOADS range guard 표(새 스냅샷만, 스키마 §4.6 — 코어 RANGE_GUARD_SCHEMA)
+RANGE_GUARD_SCHEMA = "esl/range_guard/1"
 GRAPH_SCHEMA_MAJOR = "beadgraph/1"
 _GRAPH_CACHE: "collections.OrderedDict[tuple, dict[str, Any]]" = collections.OrderedDict()
 _GRAPH_LOCK = threading.Lock()
@@ -218,6 +220,19 @@ def _graph_call(name: str, *args: Any, **kw: Any) -> Any:
     return r
 
 
+def shape_rules_of(s: dict[str, Any]) -> dict[str, Any] | None:
+    """v0.21.0 SH-1: 스터디 inputs.shape_rules(새 스냅샷만 — 키 없음 = None = v0.20.0 동작)."""
+    v = (s.get("inputs") or {}).get("shape_rules")
+    return v if isinstance(v, dict) else None
+
+
+def shape_sha(sr: dict[str, Any] | None) -> str | None:
+    """derive 캐시 키용 shape_rules 해시(None = None)."""
+    if sr is None:
+        return None
+    return hashlib.sha256(json.dumps(sr, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 def _graph_paths(ctx: AppContext, s: dict[str, Any]) -> tuple[str, str]:
     pd = _prep_dir(ctx, s)
     return os.path.join(pd, *GRAPH_JSON), os.path.join(pd, *GRAPH_LABELS)
@@ -242,21 +257,24 @@ def load_graph(ctx: AppContext, s: dict[str, Any], c: dict[str, Any], *, labels:
         return None
     gp, lp = _graph_paths(ctx, s)
     wp = os.path.join(_prep_dir(ctx, s), *W_CLAMP)
+    rp = os.path.join(_prep_dir(ctx, s), *RANGE_GUARD)
     if not _plain_file(gp):
         return None
     try:
         st = os.stat(gp)
         lst = os.stat(lp) if _plain_file(lp) else None
         wst = os.stat(wp) if _plain_file(wp) else None
+        rst = os.stat(rp) if _plain_file(rp) else None
     except OSError:
         return None
     key = (os.path.realpath(gp), st.st_mtime_ns, st.st_size, (lst.st_mtime_ns, lst.st_size) if lst else None,
-           (wst.st_mtime_ns, wst.st_size) if wst else None)
+           (wst.st_mtime_ns, wst.st_size) if wst else None, (rst.st_mtime_ns, rst.st_size) if rst else None)
+    sr = shape_rules_of(s)
     with _GRAPH_LOCK:
         hit = _GRAPH_CACHE.get(key)
         if hit is not None and (hit["labels"] is not None or not labels or lst is None):
             _GRAPH_CACHE.move_to_end(key)
-            return hit
+            return {**hit, "shape_rules": sr}
     if st.st_size > _svc()._max_mb(c) * 1024 * 1024:
         return None
     try:
@@ -284,13 +302,23 @@ def load_graph(ctx: AppContext, s: dict[str, Any], c: dict[str, Any], *, labels:
                 wc, wc_sha = d, hashlib.sha256(wraw).hexdigest()
         except (OSError, ValueError, UnicodeDecodeError):
             wc = None
+    rg, rg_sha = None, None             # v0.21.0 SH-13: range guard 표(schema 확인 — 아니면 없는 것으로)
+    if rst is not None and rst.st_size <= _svc()._max_mb(c) * 1024 * 1024:
+        try:
+            with open(rp, "rb") as fh:
+                rraw = fh.read()
+            d = json.loads(rraw.decode("utf-8"))
+            if isinstance(d, dict) and d.get("schema") == RANGE_GUARD_SCHEMA:
+                rg, rg_sha = d, hashlib.sha256(rraw).hexdigest()
+        except (OSError, ValueError, UnicodeDecodeError):
+            rg = None
     out = {"graph": graph, "labels": lab, "sha256": hashlib.sha256(raw).hexdigest(), "w_clamp": wc,
-           "w_clamp_sha256": wc_sha}
+           "w_clamp_sha256": wc_sha, "range_guard": rg, "range_guard_sha256": rg_sha}
     with _GRAPH_LOCK:
         _GRAPH_CACHE[key] = out
         while len(_GRAPH_CACHE) > _LOAD_N:
             _GRAPH_CACHE.popitem(last=False)
-    return out
+    return {**out, "shape_rules": sr}
 
 
 def check_schema(s: dict[str, Any], sel: dict[str, Any]) -> None:
@@ -387,7 +415,7 @@ def normalize(c: dict[str, Any], selection: dict[str, Any], mesh: dict | None,
     try:
         if sel_schema(selection) == 2:
             norm, sha = _graph_call("normalize_v2", selection, (graph or {}).get("graph"), c, mesh=mesh,
-                                    labels=(graph or {}).get("labels"))
+                                    labels=(graph or {}).get("labels"), shape_rules=(graph or {}).get("shape_rules"))
         else:
             norm, sha = _bs().normalize(selection, c, mesh=mesh)
     except EslError as exc:
@@ -408,7 +436,8 @@ def derive(c: dict[str, Any], inputs: dict[str, Any], norm: dict[str, Any], sha:
     sc = scfg(c)
     n = int(sc["derive_cache_n"])
     key = (sha, inputs.get("mesh_sha256"), bead, (inputs.get("graph") or {}).get("sha256"),
-           (inputs.get("graph") or {}).get("w_clamp_sha256"))
+           (inputs.get("graph") or {}).get("w_clamp_sha256"), (inputs.get("graph") or {}).get("range_guard_sha256"),
+           shape_sha((inputs.get("graph") or {}).get("shape_rules")))     # v0.21.0: 표·규칙이 다르면 다른 derive
     if n > 0:
         with _DERIVE_LOCK:
             hit = _DERIVE_CACHE.get(key)
@@ -418,7 +447,8 @@ def derive(c: dict[str, Any], inputs: dict[str, Any], norm: dict[str, Any], sha:
     if sel_schema(norm) == 2:
         g = inputs.get("graph") or {}
         fut = _POOL.submit(_graph_call, "derive_v2", inputs["mesh"], norm, c, g.get("graph"), g.get("labels"),
-                           frame=inputs["frame"], fixed_scan=inputs["fixed_scan"], bead=bead, w_clamp=g.get("w_clamp"))
+                           frame=inputs["frame"], fixed_scan=inputs["fixed_scan"], bead=bead, w_clamp=g.get("w_clamp"),
+                           range_guard=g.get("range_guard"), shape_rules=g.get("shape_rules"))   # 새 키 = 코어가 받을 때만(_graph_call)
     else:
         bs = _bs()
         fut = _POOL.submit(bs.derive, inputs["mesh"], norm, c, frame=inputs["frame"], fixed_scan=inputs["fixed_scan"],
@@ -667,7 +697,7 @@ def params_table(doc: dict[str, Any], c: dict[str, Any] | None = None) -> dict[s
 
 
 GRAPH_ROW_KEYS = ("name", "type", "bead", "tier", "nominal", "feasible", "feasible_source", "default_range", "use_default",
-                  "group_members")
+                  "group_members", "w_segs", "w_cover", "guard")      # v0.21.0: w_segs·w_cover·guard = 새 스냅샷에서만 값(키 없음 = 없음)
 
 
 def _var(bid: str, kind: str) -> str:
@@ -706,9 +736,17 @@ def _graph_rows(bd: dict[str, Any], rg: dict[str, Any], c: dict[str, Any] | None
             else:
                 fe = [_round(2.0 * float(d_nom or 0.0) + wfmin), _round(nom * (1.0 + float(rg["width_max_rel"])))]
         use = ud.get(kind) if isinstance(ud.get(kind), bool) else not short
-        rows.append({"name": _var(bid, kind), "type": kind, "bead": bid, "tier": bd.get("tier"), "nominal": nom,
-                     "feasible": fe, "feasible_source": "estimate", "default_range": list(dr), "use_default": use,
-                     "group_members": [_var(bid, kind)]})
+        row = {"name": _var(bid, kind), "type": kind, "bead": bid, "tier": bd.get("tier"), "nominal": nom,
+               "feasible": fe, "feasible_source": "estimate", "default_range": list(dr), "use_default": use,
+               "group_members": [_var(bid, kind)]}
+        # v0.21.0 SH-15·16: 새 스냅샷만 — 코어가 비드에 담은 W 구간(부분일 때)·range guard 상태를 행으로(없으면 키 없음)
+        if kind == "W" and bd.get("w_segs"):
+            row["w_segs"] = bd["w_segs"]
+            row["w_cover"] = bd.get("w_cover")
+        gd = (bd.get("guard") or {}).get(kind) if isinstance(bd.get("guard"), dict) else None
+        if isinstance(gd, dict):
+            row["guard"] = gd
+        rows.append(row)
     return rows
 
 

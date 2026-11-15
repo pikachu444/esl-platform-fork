@@ -1,8 +1,8 @@
 // 비드 DOE ② 비드·변수(esl_bead_doe.md §5·§12.2, BD-D-7): 비드별 D·W·U/V 포함 체크·범위(기본 = feasible), 범위 밖 경고 배지(차단 아님),
 // 하한 ≥ 상한·깊이/폭 ≤ 0 은 오류. DOE 방식·안 수(풀 팩토리얼은 수준)·시드 + 실제 안 수(POST /matrix). 방법·출처 ⓘ.
 import { useEffect, useRef, useState } from "react";
-import { METHOD_NAME, TYPE_NAME, doeSourcesOk, outsideFeasible, rowProblem, warnText, type ParamRow, type SpecForm } from "../api/doe";
-import type { DoeBead, DoeMatrixOut, DoeMethod, DoeMethodSources, DoeParamsOut, DoeSettingsOut } from "../api/types";
+import { METHOD_NAME, TYPE_NAME, doeSourcesOk, guardTag, outsideFeasible, paramWPartial, rowProblem, warnText, wPartialTip, type ParamRow, type SpecForm } from "../api/doe";
+import type { DoeBead, DoeMatrixOut, DoeMethod, DoeMethodSources, DoeParam, DoeParamsOut, DoeSettingsOut, DoeShapeRules } from "../api/types";
 import { useBlobUrl } from "./DoeThumbGrid";
 import { Field } from "./ui";
 
@@ -159,7 +159,30 @@ function BlendField({ bead, opts, readOnly, resolved }: { bead: string; opts: Se
   );
 }
 
-export function DoeParamTable({ data, rows, setRows, readOnly, beadPngUrl, select }: {
+/** v0.21.0 변수 이름 옆 꼬리표: W 부분("부분") · guard(축소·조합 축소·막힘·미점검) — 새 스냅샷 변수만(키 없으면 아무것도 안 그림) */
+function ShapeTags({ p, rules }: { p: DoeParam; rules: DoeShapeRules | null | undefined }) {
+  const wp = paramWPartial(p);
+  const gt = guardTag(p.guard, rules);
+  if (!wp && !gt) return null;
+  return (
+    <>
+      {wp && (
+        <span className="badge neutral doe-tag" title={wPartialTip(wp.anchors, wp.cover)} data-testid={`wpart-${p.name}`}>
+          부분
+        </span>
+      )}
+      {gt && (
+        <span className={`badge ${gt.kind} doe-tag`} title={gt.tip} data-testid={`guard-${p.name}`} data-state={p.guard?.state}>
+          {gt.label}
+        </span>
+      )}
+    </>
+  );
+}
+
+export function DoeParamTable({ data, rows, setRows, readOnly, beadPngUrl, select, shapeRules }: {
+  /** v0.21.0 스터디 스냅샷 형상 규칙(툴팁의 기준값 출처 — 없으면 값만) */
+  shapeRules?: DoeShapeRules | null;
   data: DoeParamsOut;
   rows: ParamRow[];
   setRows: (r: ParamRow[]) => void;
@@ -228,6 +251,7 @@ export function DoeParamTable({ data, rows, setRows, readOnly, beadPngUrl, selec
                       <td>
                         {p.type === "D" ? `깊이 D${p.tier ?? ""}` : "폭 W"} <span className="mono small muted">{p.name}</span>
                         {p.group_members.length > 0 && <span className="small muted" title={`같은 값: ${p.group_members.join(", ")}`}> · 묶음 {[p.name, ...p.group_members].map((n) => n.split("_")[1]).join("+")}</span>}
+                        <ShapeTags p={p} rules={shapeRules} />
                       </td>
                       <td className="num">
                         <input type="number" className="doe-num" aria-label={`${label} 하한`} step="any" value={r.lo} disabled={readOnly || !r.on} onChange={(e) => upd(p.name, { lo: e.target.value })} onFocus={() => select.onActive(p.name)} />

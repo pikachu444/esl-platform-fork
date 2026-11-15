@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as RMouseEvent } from "react";
 import type { BgIsland, BgSegment } from "../api/types";
 import { adjacentSegs, buildTree, repOf, segColor, segLabel, targetKey, SEG_TYPE_NAME, type GraphTarget, type TreeFloor } from "../view3d/select/graph";
+import { noWTip } from "../api/doe";
 import { RO_TIP, type BeadSelectCtrl } from "./BeadSelectCard";
 
 const f1 = (v: number | null | undefined) => (v == null ? "–" : v.toFixed(1));
@@ -15,7 +16,7 @@ interface Menu {
   t: GraphTarget;
 }
 
-export function SegmentTree({ ctrl, editable }: { ctrl: BeadSelectCtrl; editable: boolean }) {
+export function SegmentTree({ ctrl, editable, wPartial }: { ctrl: BeadSelectCtrl; editable: boolean; wPartial?: boolean }) {
   const gi = ctrl.graph;
   const s = ctrl.state;
   const tree = useMemo(() => (gi ? buildTree(gi) : null), [gi]);
@@ -90,7 +91,13 @@ export function SegmentTree({ ctrl, editable }: { ctrl: BeadSelectCtrl; editable
         <i className="sg-sw" style={{ background: base ? "var(--line-strong)" : sw(segColor(repOf(v, sg.id))) }} aria-hidden="true" />
         <span className="sg-name">{segLabel(sg)}</span>
         <span className="mono small muted">
-          {base ? "" : `D ${f1(dOf(sg))}${sg.entry_width != null && !["plateau", "area"].includes(sg.type) ? ` · W ${f1(sg.entry_width)}` : ""}${sg.length != null ? ` · L ${Math.round(sg.length)}` : ""}`}
+          {base ? "" : `D ${f1(dOf(sg))}${sg.entry_width != null && !["plateau", "area"].includes(sg.type) ? ` · W ${f1(sg.entry_width)}` : ""}`}
+          {!base && wPartial && sg.entry_width == null && !["plateau", "area"].includes(sg.type) && (
+            <span className="sg-now" title={noWTip([sg.anchor])} data-testid={`sg-now-${sg.id}`}>
+              {" · W —"}
+            </span>
+          )}
+          {base ? "" : sg.length != null ? ` · L ${Math.round(sg.length)}` : ""}
         </span>
         {other && <span className="badge">{s.beads[owner].id.toUpperCase()}</span>}
         {merged && <span className="badge info" title="병합한 세그먼트(한 변수)">병합</span>}

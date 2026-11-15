@@ -64,6 +64,7 @@ import numpy as np
 
 from esl.errors import EslError
 from esl.library import _util as U
+from esl.mesh import route as mroute
 
 XFER_JSON = "fixed_transfer.json"
 XFER_SCHEMA = "esl/doe_fixed_transfer/2"
@@ -780,6 +781,14 @@ def mesh0(c, echo) -> dict:
     warns_s: list[str] = list(r.get("warnings") or [])
     warns_s += [f"{w['code']}: {w.get('message') or ''}".rstrip() for w in r.get("warn_codes") or []]
     infos_s: list[str] = [str(x) for x in r.get("info") or []]
+    if (r.get("route") or {}).get("path") == "cad_relaxed":  # v0.21.0 SH-21: 완화 직행 준비 정보(경고 아님)
+        infos_s.append(text("MESH_ROUTE_RELAXED", id=ROW_ID, name=stem, n_faces=r["route"].get("n_faces"),
+                            min_faces=r["route"].get("min_faces")))
+    if stg._bs(c, "bs_mq") == "base" and isinstance(r.get("quality"), dict):   # v0.21.0 SH-23: 기준 메시 품질 미달 = 준비 경고 1건
+        fl = mroute.rank_flag(r["quality"], stg._shape(c)["mesh_route"]["rank_quality"])
+        if fl is not None:
+            warns_s.append(text("MESH_QUALITY_RANK", fail_ratio=f"{float(r['quality']['fail_ratio']) * 100:.1f} %",
+                                tria_pct=f"{float(r['quality'].get('tria_pct') or 0.0):.1f}"))
     warns_d: list[dict] = []
     infos_d: list[dict] = []
     tw = tria_check(mesh, meth, c.cfg)
@@ -800,6 +809,13 @@ def mesh0(c, echo) -> dict:
     st = r.get("stage_times")
     mrec = {"method": meth, "n_nodes": int(np.asarray(mesh["node_id"]).size),
             "n_elems": int(np.asarray(mesh["elem_type"]).size), "tri_frac": _r3(tf), "stage_times": st}
+    if stg._shape(c) is not None:                           # v0.21.0 SH-21(새 스냅샷만 — 옛 input.json 바이트 불변): 경로·메시 품질 기록
+        if r.get("route"):
+            mrec["route"] = r["route"]
+        qy = r.get("quality")
+        if isinstance(qy, dict):
+            mrec["quality"] = {"fail_ratio": qy.get("fail_ratio"), "tria_pct": qy.get("tria_pct"),
+                               "fail_elems": qy.get("fail_elems"), "n_elems": qy.get("n_elems")}
     rrec = {k: rinfo[k] for k in ("mode", "rule", "n_in", "n_out", "out_bbox")}
     bm = sc.save_base(t, c.p("prep"), "select", c.writer,
                       extra={"props": props, "h": h, "mesh_method": meth, "tri_frac": _r3(tf), "gmsh_version": ver,

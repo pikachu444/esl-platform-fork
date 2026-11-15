@@ -234,3 +234,104 @@ def affected_quality(base_mesh: dict, x_design, elem_mask, qcfg: dict, *, flip_d
                max_flip_deg=float(ang.max()))
     out["over_limit"] = bool(out["new_fail_ratio"] > mx)
     return out
+
+
+# ---------------------------------------------------------------- v0.21.0 range guard 탐침(esl_bead_shape_v021.md §4.1) — 추가만
+def _area(X, C, et) -> np.ndarray:
+    """요소 넓이(``esl.morph.core.extremes`` 와 같은 식·같은 연산 순서 — 넓이 비 비트 같음)."""
+    X = np.asarray(X, dtype=np.float64)
+    a, b, c = X[C[:, 0]], X[C[:, 1]], X[C[:, 2]]
+    w = np.cross(b - a, c - a)
+    qd = et == 4
+    if qd.any():
+        d = X[C[qd, 3]]
+        w[qd] = np.cross(c[qd] - a[qd], d - b[qd])
+    return 0.5 * np.linalg.norm(w, axis=1)
+
+
+def guard_probe(x0, x, conn, elem_type, idx, *, flip_deg, jac_min, tria_angle_min_deg, qcfg=None, base=None) -> dict:
+    """영향 요소(idx) 품질 탐침 — range guard ``accept`` 의 입력. 뒤집힘 = ``inverted_count``(= ``design_state`` 판정) 그대로,
+    "새로 나빠진" 요소만 셈: quad 야코비안 공칭 ≥ jac_min ∧ 안 < jac_min(jac_bad_new), tria 최소 내각 공칭 ≥ tria_angle_min_deg
+    ∧ 안 <(tri_bad_new). jac_min·tria_angle_min_deg 가 None 이면 그 수는 0. 넓이 비 최소 = ``core.extremes`` 와 같은 식.
+    qcfg(compare.quality)를 주면 새 Fail 비율(``affected_quality`` 와 같은 Fail 규칙), 아니면 None. base = 같은 idx 의
+    ``guard_base`` 결과(공칭 지표 재사용 — 값 같음). 반환 {n_affected, inverted, jac_min, jac_bad_new, tri_angle_min,
+    tri_bad_new, area_ratio_min, new_fail_ratio}."""
+    idx = np.asarray(idx, dtype=np.int64)
+    out = {"n_affected": int(idx.size), "inverted": 0, "jac_min": None, "jac_bad_new": 0, "tri_angle_min": None,
+           "tri_bad_new": 0, "area_ratio_min": None, "new_fail_ratio": None}
+    if idx.size == 0:
+        if qcfg is not None:
+            out["new_fail_ratio"] = 0.0
+        return out
+    out["inverted"] = inverted_count(x0, x, conn, elem_type, idx, flip_deg=flip_deg)
+    b0 = base if base is not None else guard_base(x0, conn, elem_type, idx)
+    C, et = b0["C"], b0["et"]
+    m0 = b0["m"]
+    m1 = element_metrics(x, C, et) if qcfg is not None else _jac_angle(x, C, et)
+    q = m1["is_quad"]
+    if q.any():
+        out["jac_min"] = float(m1["jacobian"][q].min())
+        if jac_min is not None:
+            out["jac_bad_new"] = int(np.sum(q & (m0["jacobian"] >= float(jac_min)) & (m1["jacobian"] < float(jac_min))))
+    t = ~q
+    if t.any():
+        out["tri_angle_min"] = float(m1["min_angle"][t].min())
+        if tria_angle_min_deg is not None:
+            lim = float(tria_angle_min_deg)
+            out["tri_bad_new"] = int(np.sum(t & (m0["min_angle"] >= lim) & (m1["min_angle"] < lim)))
+    out["area_ratio_min"] = float(np.min(_area(x, C, et) / np.maximum(b0["area"], 1e-300)))
+    if qcfg is not None:
+        f0 = b0.get("fail")
+        if f0 is None:
+            f0, _ = _fail_mask(m0, qcfg)
+        f1, _ = _fail_mask(m1, qcfg)
+        out["new_fail_ratio"] = float(np.sum(f1 & ~f0)) / idx.size
+    return out
+
+
+def guard_base(x0, conn, elem_type, idx, qcfg=None) -> dict:
+    """``guard_probe`` 의 공칭 쪽 계산(같은 idx 로 여러 번 탐침할 때 1회만): {C, et, m, area[, fail]}."""
+    idx = np.asarray(idx, dtype=np.int64)
+    C = np.asarray(conn, dtype=np.int64)[idx]
+    et = np.asarray(elem_type).astype(int)[idx]
+    m = element_metrics(x0, C, et)
+    out = {"C": C, "et": et, "m": m, "area": _area(x0, C, et)}
+    if qcfg is not None:
+        out["fail"] = _fail_mask(m, qcfg)[0]
+    return out
+
+
+def _jac_angle(x0, conn, elem_type) -> dict:
+    """``element_metrics`` 의 jacobian·min_angle·is_quad 만(같은 식·같은 연산 순서 — 값 비트 같음, guard 탐침 속도용)."""
+    X = np.asarray(x0, dtype=np.float64)
+    C = np.asarray(conn, dtype=np.int64)
+    q = np.asarray(elem_type).astype(int) == 4
+    ne = C.shape[0]
+    out = {"min_angle": np.zeros(ne), "jacobian": np.ones(ne), "is_quad": q}
+    for mask, k in ((q, 4), (~q, 3)):
+        if not mask.any():
+            continue
+        P = X[C[mask, :k]]
+        A = np.stack([_ang(np.roll(P, 1, axis=1)[:, i] - P[:, i], np.roll(P, -1, axis=1)[:, i] - P[:, i])
+                      for i in range(k)], axis=1)
+        out["min_angle"][mask] = A.min(axis=1)
+        if k == 4:
+            p0, p1, p2, p3 = (P[:, i] for i in range(4))
+            n = np.cross(p2 - p0, p3 - p1)
+            n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-300)
+            e1 = (p1 - p0) - np.einsum("ij,ij->i", p1 - p0, n)[:, None] * n
+            e1 /= np.maximum(np.linalg.norm(e1, axis=1, keepdims=True), 1e-300)
+            e2 = np.cross(n, e1)
+            R = P - P.mean(axis=1, keepdims=True)
+            xy = np.stack([np.einsum("mkj,mj->mk", R, e1), np.einsum("mkj,mj->mk", R, e2)], axis=2)
+            g = 1.0 / np.sqrt(3.0)
+            dets = []
+            for xi, eta in ((-g, -g), (g, -g), (g, g), (-g, g)):
+                dxi = 0.25 * np.array([-(1 - eta), (1 - eta), (1 + eta), -(1 + eta)])
+                deta = 0.25 * np.array([-(1 - xi), -(1 + xi), (1 + xi), (1 - xi)])
+                a = np.einsum("k,mkj->mj", dxi, xy)
+                b = np.einsum("k,mkj->mj", deta, xy)
+                dets.append(a[:, 0] * b[:, 1] - a[:, 1] * b[:, 0])
+            D = np.stack(dets, axis=1)
+            out["jacobian"][mask] = D.min(axis=1) / np.maximum(np.abs(D).max(axis=1), 1e-300)
+    return out
