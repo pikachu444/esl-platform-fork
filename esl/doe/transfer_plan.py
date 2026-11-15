@@ -28,26 +28,36 @@ CELL_MAX_MM = 200.0          # 셀 크기 상한 — 한 곳(backend core.config
 #             2배 촘촘 12.3, 회전 응축 11.9 — esl_stiffness_metric.md §2.1). 코드·시험은 남김(계획 표에서 비활성).
 #   sm_omega = 강체 제거·에너지 범위(all | step_region | compare_region), sm_rank = 순위 지표 metric(스냅샷 rank.metric) |
 #   solve(다른 메시 비교 — 형상·안마다 work 하중 재풀이 C, 경고 SM_CROSS_MESH, 결과 metric_effective = solve).
+# v0.21.0 BEAD_SHAPE 열(esl_bead_shape_v021.md §2.2 SH-2 — 값 none = 그 모드에 항목 없음):
+#   bs_wpart = graph(그래프 비드 W 를 W 가능 구간 S_W 에만) | none,  bs_guard = basis(그 모드 기준 메시 위 그래프 기저로 range guard) | none,
+#   bs_route = base(기준 STEP 1개 cad_relaxed 직행 판정) | shapes(형상 STEP 마다) | none,
+#   bs_mq    = base(기준 메시 품질 → 결과 경고 1건) | shapes(형상마다 → 순위 행 ⚠) | none.
+#   스냅샷 doe.shape_rules 가 있을 때만 쓰임(키 없음 = v0.20.0). PLAN_VERSION 은 올리지 않음(hash_view 불변) — 규칙 판은 shape_rules.schema.
 PLANS = {
     "case_once": {"dst": "baseline", "reuse": "once", "identity": "topo", "placement": "global", "mask": "none",
                   "truth": "self_direct", "alt_designs": False,
-                  "sm_ref": "base", "sm_disp": ("I", "I"), "sm_omega": "all", "sm_rank": "metric"},
+                  "sm_ref": "base", "sm_disp": ("I", "I"), "sm_omega": "all", "sm_rank": "metric",
+                  "bs_wpart": "graph", "bs_guard": "basis", "bs_route": "none", "bs_mq": "none"},
     "bmesh_once": {"dst": "baseline", "reuse": "once", "identity": "none", "placement": "auto", "mask": "none",
                    "truth": "a_direct", "alt_designs": False,
-                   "sm_ref": "base", "sm_disp": ("I", "I"), "sm_omega": "all", "sm_rank": "metric"},
+                   "sm_ref": "base", "sm_disp": ("I", "I"), "sm_omega": "all", "sm_rank": "metric",
+                   "bs_wpart": "graph", "bs_guard": "basis", "bs_route": "none", "bs_mq": "none"},
     "step_once": {"dst": "baseline", "reuse": "once", "identity": "none", "placement": "auto", "mask": "step_region",
                   "truth": "a_direct", "alt_designs": False,
-                  "sm_ref": "base", "sm_disp": ("I", "I"), "sm_omega": "step_region", "sm_rank": "metric"},
+                  "sm_ref": "base", "sm_disp": ("I", "I"), "sm_omega": "step_region", "sm_rank": "metric",
+                  "bs_wpart": "graph", "bs_guard": "basis", "bs_route": "base", "bs_mq": "base"},
     "step_per_design": {"dst": "design", "reuse": "per_target", "identity": "none", "placement": "auto", "mask": "none",
                         "truth": "a_direct", "alt_designs": False,
-                        "sm_ref": "none", "sm_disp": ("none", "none"), "sm_omega": "all", "sm_rank": "solve"},
+                        "sm_ref": "none", "sm_disp": ("none", "none"), "sm_omega": "all", "sm_rank": "solve",
+                        "bs_wpart": "none", "bs_guard": "none", "bs_route": "none", "bs_mq": "none"},
     "compare_per_shape": {"dst": "shape", "reuse": "per_target", "identity": "topo+coords", "placement": "global",
                           "mask": "compare_region", "truth": "compare", "alt_designs": True,
                           "sm_ref": "none", "sm_disp": ("none", "none"), "sm_omega": "compare_region",
-                          "sm_rank": "solve"},
+                          "sm_rank": "solve",
+                          "bs_wpart": "none", "bs_guard": "none", "bs_route": "shapes", "bs_mq": "shapes"},
 }
 PLAN_COLS = ("dst", "reuse", "identity", "placement", "mask", "truth", "alt_designs", "sm_ref", "sm_disp", "sm_omega",
-            "sm_rank")
+            "sm_rank", "bs_wpart", "bs_guard", "bs_route", "bs_mq")
 PLAN_OF = {("same", None): "case_once", ("select", "case"): "case_once", ("mesh", None): "bmesh_once",
            ("select", "mesh"): "bmesh_once", ("select", "step"): "step_once", ("step", None): "step_per_design",
            ("compare", None): "compare_per_shape"}
@@ -63,6 +73,9 @@ def plan_for(scenario: str, select_base: str | None = None) -> dict:
     miss = [k for k in PLAN_COLS if row.get(k) in (None, "", ())]
     if miss:                                     # 새 계획 행은 모든 열을 채움(빈 칸 = CONFIG_INVALID)
         raise EslError("CONFIG_INVALID", f"하중 전달 계획 {pid} 빈 열: {miss}")
+    badv = [k for k, vs in BS_VALUES.items() if row[k] not in vs]
+    if badv:
+        raise EslError("CONFIG_INVALID", f"하중 전달 계획 {pid} 형상 규칙 열 값 오류: {badv}")
     return {"id": pid, **row}
 
 
@@ -112,6 +125,99 @@ def resolve(spec_lt: dict | None, scenario: str, defaults: dict | None = None) -
     if not float(w["fail_dist_mm"]) > 0 or not 0.0 <= float(w["fail_frac"]) <= 1.0:
         bad("work.fail_dist_mm > 0, 0 ≤ fail_frac ≤ 1")
     return lt
+
+
+BS_VALUES = {"bs_wpart": ("graph", "none"), "bs_guard": ("basis", "none"), "bs_route": ("base", "shapes", "none"),
+             "bs_mq": ("base", "shapes", "none")}
+SHAPE_SCHEMA = 1
+
+
+def resolve_shape(spec: dict | None, defaults: dict | None = None, *, flip_deg: float | None = None) -> dict | None:
+    """스냅샷 ``doe.shape_rules``(또는 설정 절 ``bead_doe.shape_rules``) → 해석된 규칙. None = legacy(키 없음·꺼짐).
+    defaults = bead_doe 설정(없으면 DEFAULTS). 설정 절을 넘기면(``enabled`` 키 있음) 기본 위에 합치고, 꺼짐(enabled false)이면 None.
+    flip_deg = select.quality.flip_deg(None → defaults). range_guard 꺼짐 → ``range_guard`` None. 잘못된 블록 = CONFIG_INVALID."""
+    if spec is None:
+        return None
+    if not isinstance(spec, dict):
+        raise EslError("CONFIG_INVALID", "shape_rules 는 매핑이어야 함")
+    if defaults is None:
+        from esl.doe import DEFAULTS as defaults
+    if spec.get("enabled") is False:
+        return None
+    base = copy.deepcopy(defaults["shape_rules"])
+    sr = _merge(base, copy.deepcopy({k: v for k, v in spec.items() if k not in ("schema", "enabled")}))
+
+    def bad(msg):
+        raise EslError("CONFIG_INVALID", f"shape_rules.{msg}")
+
+    def num(v, lo, hi, *, lo_open=True, hi_open=False):
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and (v > lo if lo_open else v >= lo) and \
+            (v < hi if hi_open else v <= hi)
+    if not isinstance(sr.get("w_partial"), bool):
+        bad("w_partial bool")
+    rg = sr.get("range_guard")
+    if rg is not None:
+        if not isinstance(rg, dict):
+            bad("range_guard 는 매핑이어야 함")
+        if rg.get("enabled") is False:
+            rg = None
+    if rg is not None:
+        rg = dict(rg)
+        rg.pop("enabled", None)
+        if "flip_deg" not in rg:
+            rg["flip_deg"] = float(flip_deg if flip_deg is not None else defaults["select"]["quality"]["flip_deg"])
+        if not num(rg["jac_min"], 0, 1, hi_open=True):
+            bad("range_guard.jac_min (0, 1)")
+        if not num(rg["tria_angle_min_deg"], 0, 60, hi_open=True):
+            bad("range_guard.tria_angle_min_deg (0, 60)")
+        if not num(rg["area_ratio_min"], 0, 1, hi_open=True):
+            bad("range_guard.area_ratio_min (0, 1)")
+        if rg["max_new_fail_ratio"] is not None and not num(rg["max_new_fail_ratio"], 0, 1):
+            bad("range_guard.max_new_fail_ratio null | (0, 1]")
+        if not isinstance(rg["steps"], int) or isinstance(rg["steps"], bool) or not 1 <= rg["steps"] <= 20:
+            bad("range_guard.steps 1..20")
+        if not num(rg["min_keep_frac"], 0, 1, lo_open=False, hi_open=True):
+            bad("range_guard.min_keep_frac [0, 1)")
+        cb = rg["combo"]
+        for k, lo, hi in (("full_max_vars", 1, 8), ("samples", 1, 256), ("max_group", 2, 32)):
+            if not isinstance(cb[k], int) or isinstance(cb[k], bool) or not lo <= cb[k] <= hi:
+                bad(f"range_guard.combo.{k} {lo}..{hi}")
+        if not isinstance(cb["enabled"], bool):
+            bad("range_guard.combo.enabled bool")
+        bg = rg["budget"]
+        if not num(bg["prep_timeout_s"], 0, 3600) or not num(bg["matrix_timeout_s"], 0, 3600):
+            bad("range_guard.budget.*_timeout_s (0, 3600]")
+        for k, hi in (("max_evals", 1_000_000), ("max_vars", 2000)):
+            if not isinstance(bg[k], int) or isinstance(bg[k], bool) or not 1 <= bg[k] <= hi:
+                bad(f"range_guard.budget.{k} 1..{hi}")
+    mr = sr["mesh_route"]
+    rd = mr["relaxed_direct"]
+    if not isinstance(rd["enabled"], bool):
+        bad("mesh_route.relaxed_direct.enabled bool")
+    if rd["min_faces"] is not None and (not isinstance(rd["min_faces"], int) or isinstance(rd["min_faces"], bool)
+                                        or rd["min_faces"] < 1):
+        bad("mesh_route.relaxed_direct.min_faces null | >= 1")
+    if rd["min_step_mb"] is not None and not num(rd["min_step_mb"], 0, float("inf")):
+        bad("mesh_route.relaxed_direct.min_step_mb null | > 0")
+    rq = dict(mr["rank_quality"])
+    if not num(rq["fail_ratio"], 0, 1):
+        bad("mesh_route.rank_quality.fail_ratio (0, 1]")
+    if rq["tria_pct"] is None:                   # null → compare.quality.tria_pct.fail 로 고정(SH-22)
+        rq["tria_pct"] = float(defaults["compare"]["quality"]["tria_pct"]["fail"])
+    elif not num(rq["tria_pct"], 0, 100):
+        bad("mesh_route.rank_quality.tria_pct null | (0, 100]")
+    return {"schema": SHAPE_SCHEMA, "w_partial": bool(sr["w_partial"]), "range_guard": rg,
+            "mesh_route": {"relaxed_direct": dict(rd), "rank_quality": rq}}
+
+
+def shape_hash_view(rules: dict | None) -> dict | None:
+    """새 스냅샷 선택 설정 해시 기여(SH-26): schema·w_partial·range_guard 의 crit·steps·min_keep_frac·combo(budget 제외). None = 기여 없음."""
+    if rules is None:
+        return None
+    rg = rules.get("range_guard")
+    if rg is not None:
+        rg = {k: rg[k] for k in sorted(rg) if k != "budget"}
+    return {"schema": rules.get("schema"), "w_partial": rules.get("w_partial"), "range_guard": rg}
 
 
 def metric_effective(plan: dict, metric: str) -> str:

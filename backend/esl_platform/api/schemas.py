@@ -1779,6 +1779,8 @@ class DoeSettingsOut(_Out):
     load_transfer: dict[str, Any] | None = None
     # v0.20.0 강성 지표 설정 {metric, lin_form, lin_valid, imbalance_warn}(새 스터디 기본·경고 문턱)
     rank: dict[str, Any] | None = None
+    # v0.21.0 형상 규칙 설정(표시용, esl_bead_shape_v021.md §6): {enabled, w_partial, range_guard{enabled}, mesh_route{relaxed_direct{enabled, min_faces}}}
+    shape_rules: dict[str, Any] | None = None
     select_reason: str | None = None                # v0.15.0 select 비활성 사유(DOE_DISABLED·SELECT_DISABLED), null = 사용 가능
     select: dict[str, Any] | None = None           # v0.15.0 {enabled, reason, feature_angle_deg, max_beads, max_tiers, blend{min_mm, max_mm}}
 

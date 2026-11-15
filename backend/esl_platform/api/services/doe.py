@@ -290,6 +290,26 @@ def _rank_settings(c: dict[str, Any]) -> dict[str, Any]:
             "imbalance_warn": float(r["imbalance_warn"])}
 
 
+def _shape_settings(c: dict[str, Any]) -> dict[str, Any]:
+    """v0.21.0 GET /doe/settings.shape_rules(§6, 표시용): {enabled, w_partial, range_guard{enabled}, mesh_route{relaxed_direct{enabled, min_faces}}}."""
+    sr = c["shape_rules"]
+    return {"enabled": bool(sr["enabled"]), "w_partial": bool(sr["w_partial"]),
+            "range_guard": {"enabled": bool(sr["range_guard"]["enabled"])},
+            "mesh_route": {"relaxed_direct": {"enabled": bool(sr["mesh_route"]["relaxed_direct"]["enabled"]),
+                                              "min_faces": sr["mesh_route"]["relaxed_direct"]["min_faces"]}}}
+
+
+def shape_snapshot(c: dict[str, Any]) -> dict[str, Any] | None:
+    """v0.21.0 SH-1: 새 스터디의 형상 규칙 고정 블록(설정 bead_doe.shape_rules 해석 — 뒤집힘 각은 select.quality.flip_deg 복사).
+    enabled false(또는 잘못된 블록 아님) = None = 스냅샷에 키를 쓰지 않음(v0.20.0 동작). 잘못된 값 = 422 CONFIG_INVALID."""
+    from ...core.opt_core import EslError, doe_transfer_plan as tp
+
+    try:
+        return tp.resolve_shape(c["shape_rules"], c, flip_deg=float(c["select"]["quality"]["flip_deg"]))
+    except EslError as exc:
+        raise unprocessable(exc.code, str(exc)) from None
+
+
 LT_SCHEMA = 1       # 작업 spec params.doe.load_transfer.schema(esl_load_transfer.md §4.2)
 RANK_SCHEMA = 1     # 작업 spec params.doe.rank.schema(esl_stiffness_metric.md §6)
 
@@ -377,6 +397,7 @@ def settings_out(ctx: AppContext, principal: Principal | None = None) -> dict[st
             "compare": _compare_settings(ctx, c, st),
             "load_transfer": _lt_settings(c),
             "rank": _rank_settings(c),
+            "shape_rules": _shape_settings(c),
             "select": {"enabled": st["scenarios"]["select"], "reason": st["select_reason"],
                        "feature_angle_deg": float(sc["feature_angle_deg"]), "max_beads": int(sc["max_beads"]),
                        "max_tiers": int(sc["max_tiers"]),
@@ -1174,6 +1195,9 @@ def _create_compare(ctx: AppContext, principal: Principal, body, out: dict[str, 
            "rank": rank}
     if mat["base"]:
         doe["base"] = dict(mat["base"])
+    if (shape := shape_snapshot(cfg(ctx))) is not None:             # v0.21.0 SH-1(④ 도 같은 블록 — 계획 열 bs_route·bs_mq)
+        doe["shape_rules"] = shape
+        inputs["shape_rules"] = copy.deepcopy(shape)
     params = {"bead_doe_id": sid, "kind": "PREP", "out_rel": f"{DOE_DIR}/{sid}", "doe": doe,
               "warnings": list(out["warnings"])}
     return _insert_study_job(ctx, principal, sid=sid, project_id=body.project_id, scenario="compare", title=title,
@@ -1262,6 +1286,9 @@ def create_study(ctx: AppContext, principal: Principal, body) -> dict[str, Any]:
         doe["select_schema"] = SELECT_SCHEMA_NEW        # v0.17.0 BG-D-40: BD_LOADS 그래프 단계·BD_GEOM 힌트 plan(키 없음 = 1)
     doe["load_transfer"] = copy.deepcopy(mat["load_transfer"])      # v0.20.0 §13.6: 공통 블록 + schema(옛 스터디 = 키 없음)
     doe["rank"] = rank                                              # v0.20.0 SM-2
+    if (shape := shape_snapshot(c)) is not None:                    # v0.21.0 SH-1: 같은 블록을 작업 스냅샷·inputs 에(옛 = 키 없음)
+        doe["shape_rules"] = shape
+        inputs["shape_rules"] = copy.deepcopy(shape)
     params = {"bead_doe_id": sid, "kind": "PREP", "out_rel": f"{DOE_DIR}/{sid}", "doe": doe,
               "warnings": list(out["warnings"])}
     return _insert_study_job(ctx, principal, sid=sid, project_id=body.project_id, scenario=body.scenario, title=title,
@@ -1792,6 +1819,10 @@ def results(ctx: AppContext, principal: Principal, sid: str, sort: str = "score"
     rs = r.get("summary") if isinstance(r.get("summary"), dict) else {}
     if "best_clean" in rs or "best_clean" in r:
         out["summary"] = {"best_clean": rs.get("best_clean", r.get("best_clean"))}
+    # v0.21.0 SH-22~24(새 스냅샷만): ④ best_clean_mq(품질 경고 없는 최상위 형상 id)·③ mesh_quality{fail_ratio, tria_pct, warn} — 있을 때만 통과
+    for k in ("best_clean_mq", "mesh_quality"):
+        if k in rs:
+            out.setdefault("summary", {})[k] = rs[k]
     # v0.20.0 ④ 하중 전달 진단 요약·3D 같은 ESL 대응표(esl_load_transfer.md §5·LT-9) — 새 스냅샷만(legacy = 결과에 키 없음 → null)
     if isinstance(r.get("load_transfer"), dict):
         out["load_transfer"] = r["load_transfer"]

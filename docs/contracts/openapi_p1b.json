@@ -3904,6 +3904,18 @@
             ],
             "title": "Select Reason"
           },
+          "shape_rules": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shape Rules"
+          },
           "step_max_mb": {
             "title": "Step Max Mb",
             "type": "number"
