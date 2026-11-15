@@ -6,6 +6,7 @@ import type {
   DoeCheckIn, DoeCheckOut, DoeCompareCfg, DoeLoadTransferCfg, DoeLoadTransferDiag, DoeLoadTransferMethod, DoeLoadTransferSummary, DoeMeshAttempt, DoeMeshMethod, DoeMeshMode, DoeMeshPart, DoePrepShape, DoeShapeRef, DoeDesignStatus, DoeFileOut, DoeMatrixOut, DoeMethod, DoeMethodSources, DoeParam, DoeParamType, DoeParamsOut, DoePhase, DoePlanOut,
   DoePerEslOut, DoeRankRow, DoeResultOut, DoeScenario, DoeSettingsOut, DoeSpec, DoeStudyIn, DoeStudyOut, EntryOut,
   DoeFixedXferMethod, DoePrepFixedXfer, DoeWarning, DeleteCheckOut, DeleteOut,
+  DoeGuard, DoeParam as DoeParamRow, DoeRankMq, DoeShapeRoute, DoeShapeRules, XY,
 } from "./types";
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -600,7 +601,7 @@ export function stepPrepGroups(prep: StepPrep | null | undefined, triaWarnFrac =
 /** v0.16.2 자동 탐지 단계 이름(AUTO_DETECT_FAILED.step) */
 const AUTO_STEP_NAME: Record<string, string> = { version: "형상 엔진 확인", assem_full: "조립 읽기", fixed: "체결 스캔", extract0: "형상 읽기", extract: "비드 인식", tag: "메시 대응" };
 /** v0.16.2 정보 수준 자동 탐지 코드(서버가 level 을 안 줄 때도 ⓘ) */
-const AUTO_INFO = new Set(["AUTO_GROUP_DROPPED", "AUTO_SLOPE_DIFF", "AUTO_HINT_UNAVAILABLE", "GRAPH_RASTER_COARSE", "BG_SHARED_CHILD", "BG_CORNER_GUARD", "BG_ISLAND_HELD", "BG_RANGE_CLAMPED", "FIXED_XFER_NONE", "FIXED_XFER_UNMATCHED", "STEP_GRAPH_REGION"]);
+const AUTO_INFO = new Set(["BG_W_PARTIAL", "RG_RANGE_LIMITED", "RG_COMBO_LIMITED", "RG_COMBO_SKIPPED", "RG_UNCHECKED", "RG_BUDGET", "MESH_ROUTE_RELAXED", "AUTO_GROUP_DROPPED", "AUTO_SLOPE_DIFF", "AUTO_HINT_UNAVAILABLE", "GRAPH_RASTER_COARSE", "BG_SHARED_CHILD", "BG_CORNER_GUARD", "BG_ISLAND_HELD", "BG_RANGE_CLAMPED", "FIXED_XFER_NONE", "FIXED_XFER_UNMATCHED", "STEP_GRAPH_REGION"]);
 /** v0.16.2 자동 탐지·건너 잇기 경고 1줄(인자 포함) — 서버 문구가 없을 때. AUTO_DETECT_FAILED = {code, message, step, detail}(detail = 안쪽 paicad·코어 코드) */
 function autoWarnText(w: Record<string, unknown>): string {
   const n = (v: unknown) => (typeof v === "number" ? Number(v.toFixed(1)).toString() : String(v ?? "?"));
@@ -650,6 +651,37 @@ function autoWarnText(w: Record<string, unknown>): string {
         : "";
     case "BG_ISLAND_HELD":
       return w.island != null ? `섬 ${n(w.island)}: 고정 노드가 있어 제자리 블렌딩` : "";
+    // v0.21.0 BEAD_SHAPE(esl_bead_shape_v021.md §8) — 서버 문구가 없을 때만, 수치는 모두 경고 필드에서
+    case "BG_W_PARTIAL":
+      return w.bead != null && w.n_w != null && w.n_seg != null
+        ? `${B(w.bead)}: 폭 W 는 폭 정보가 있는 ${n(w.n_w)}/${n(w.n_seg)} 구간${typeof w.cover === "number" ? `(길이 ${(w.cover * 100).toFixed(0)} %)` : ""}에만 적용 — 나머지 구간은 깊이만 바뀝니다`
+        : "";
+    case "RG_RANGE_LIMITED": {
+      const rg = (v: unknown) => (Array.isArray(v) ? `${n(v[0])}~${n(v[1])}` : n(v));
+      return w.var != null && w.from != null && w.to != null
+        ? `${String(w.var)}: 기본 범위 ${rg(w.from)} → ${rg(w.to)} mm 로 줄였습니다(${w.side === "lo" ? "하한" : "상한"} 쪽 ${guardReasonText(w.reason, w.value)})`
+        : "";
+    }
+    case "RG_VAR_BLOCKED":
+      return w.var != null ? `${String(w.var)}: 양쪽 모두 거의 움직일 수 없습니다${Array.isArray(w.usable) ? `(안전 범위 ${n(w.usable[0])}~${n(w.usable[1])} mm)` : ""} — 기본 체크를 해제했습니다` : "";
+    case "RG_COMBO_LIMITED":
+      return Array.isArray(w.vars) && w.scale != null
+        ? `${w.vars.map(String).join("·")}: 함께 바꾸면 ${n(w.bad_n)}/${n(w.corners)} 꼭짓점이 ${guardReasonText(w.reason, null)} — 공통 비율 ×${Number(Number(w.scale).toFixed(2))} 로 줄였습니다`
+        : "";
+    case "RG_COMBO_SKIPPED":
+      return Array.isArray(w.vars) ? `${w.vars.map(String).join("·")}: 묶음 ${n(w.n)}개가 커서 조합 점검을 생략했습니다` : "";
+    case "RG_UNCHECKED":
+      return w.var != null ? `${String(w.var)}: 준비 표에 없어 미점검 — 미리보기 준비에서 점검합니다` : "";
+    case "RG_BUDGET":
+      return w.done != null && w.total != null ? `비용 상한(${w.stopped === "time" ? "시간" : w.stopped === "vars" ? "변수 수" : "시험 횟수"})으로 ${n(w.done)}/${n(w.total)} 변수만 점검했습니다` : "";
+    case "RG_FAILED":
+      return `품질 점검 계산 실패${w.code != null ? `(${String(w.code)})` : ""} — 범위 축소 없이 진행합니다`;
+    case "RG_OUTSIDE_GUARD":
+      return Array.isArray(w.vars) ? `점검된 안전 범위 밖 값: ${(w.vars as { name: string; value: number; usable: XY }[]).map((x) => `${x.name} ${n(x.value)}(${n(x.usable[0])}~${n(x.usable[1])})`).join(" · ")}` : "";
+    case "MESH_ROUTE_RELAXED":
+      return w.name != null || w.id != null ? `${String(w.name ?? w.id)}: STEP 면 ${n(w.n_faces)} ≥ ${n(w.min_faces)} — cad 를 건너뛰고 완화 메싱으로 시작했습니다` : "";
+    case "MESH_QUALITY_RANK":
+      return meshQualityRankText(w);
     case "BG_OUTSIDE_MOVED":
       return w.n != null && w.max_mm != null ? `바뀐 세그먼트 밖 ${n(w.n)} 노드가 최대 ${n(w.max_mm)} mm 움직였습니다` : "";
     default:
@@ -667,6 +699,7 @@ export type SelectDeriveWarnCode =
 const mm1 = (v: number) => (v < 10 ? Number(v.toFixed(2)).toString() : v.toFixed(1));
 /** v0.16.1 안 경고 1줄(§8): FIXED_MOVED = "고정 노드 n개, 최대 x mm 이동", QUALITY_WARN = "새 Fail m (r %)" */
 export function cellWarnText(w: DoeCellWarning): string {
+  if (w.code === "RG_OUTSIDE_GUARD") return w.vars.map((x) => `${x.name} ${Number(x.value.toFixed(2))} (안전 ${gr(x.usable)})`).join(" · ");
   if (w.code === "SELECT_FIXED_MOVED") return `고정 노드 ${w.n.toLocaleString()}개, 최대 ${mm1(w.max_mm)} mm 이동`;
   if (w.code === "SELECT_CROSS_BEAD_MOVE") return `다른 비드 경계·바닥 ${w.n.toLocaleString()}노드, 최대 ${mm1(w.max_mm)} mm 이동`;
   const ext = w.area_ratio_min != null || w.rot_max_deg != null
@@ -674,7 +707,77 @@ export function cellWarnText(w: DoeCellWarning): string {
   return `새 Fail ${w.new_fail.toLocaleString()} (${(w.new_fail_ratio * 100).toFixed(1)} %)${ext}`;
 }
 /** 순위 행 경고 이름 */
-export const RANK_WARN_NAME: Record<string, string> = { FIXED_MOVED: "체결 위치 어긋남", QUALITY_WARN: "품질 경고", CROSS_BEAD_MOVE: "다른 비드 침범", MORPH_EXTREME_ELEMENTS: "극단 요소" };
+export const RANK_WARN_NAME: Record<string, string> = { FIXED_MOVED: "체결 위치 어긋남", QUALITY_WARN: "품질 경고", CROSS_BEAD_MOVE: "다른 비드 침범", MORPH_EXTREME_ELEMENTS: "극단 요소", MESH_QUALITY_RANK: "메시 품질 미달" };
+
+// ---------------------------------------------------------------- v0.21.0 BEAD_SHAPE(esl_bead_shape_v021.md) — 모든 수치는 응답 필드(스냅샷·결과)에서만
+/** guard 판정 기준 이름(range_guard.CRITERIA) */
+export const GUARD_REASON_NAME: Record<string, string> = { inverted: "요소 뒤집힘", jac: "야코비안 저하", tri_angle: "tria 최소 내각 저하", area_ratio: "넓이 비 저하", new_fail: "새 Fail" };
+/** 기준 이름 + 값(있으면): "야코비안 저하(0.214)" */
+export function guardReasonText(reason: unknown, value: unknown): string {
+  const k = typeof reason === "string" ? reason : "";
+  const name = GUARD_REASON_NAME[k] ?? (k || "품질 기준");
+  return typeof value === "number" && Number.isFinite(value) ? `${name} ${Number(value.toFixed(3))}` : name;
+}
+/** 스냅샷 기준값 대비 문구(기준값은 shape_rules.range_guard — 없으면 값만) */
+const guardLimit = (reason: string | null | undefined, rules: DoeShapeRules | null | undefined): string => {
+  const g = rules?.range_guard;
+  const v = reason === "jac" ? g?.jac_min : reason === "tri_angle" ? g?.tria_angle_min_deg : reason === "area_ratio" ? g?.area_ratio_min : reason === "new_fail" ? g?.max_new_fail_ratio : null;
+  return v != null ? ` (기준 ${v}${reason === "tri_angle" ? "°" : ""})` : "";
+};
+const gr = (v: XY) => `${Number(v[0].toFixed(2))}~${Number(v[1].toFixed(2))}`;
+/** 변수 표 guard 꼬리표: limited·blocked·unchecked 만(ok·없음 = null) — 라벨·종류·툴팁 */
+export function guardTag(g: DoeGuard | null | undefined, rules?: DoeShapeRules | null): { label: string; kind: "info" | "warn" | "neutral"; tip: string } | null {
+  if (!g || (g.state === "ok" && !(g.combo_scale != null && g.combo_scale < 1))) return null;
+  if (g.state === "unchecked") return { label: "미점검", kind: "neutral", tip: "품질 점검 전 — 준비 표에 없는 변수라 미리보기 준비에서 점검합니다" };
+  const why = g.reason ? `${guardReasonText(g.reason, g.value)}${guardLimit(g.reason, rules)}` : "";
+  const range = g.usable ? `${gr(g.from)} → ${gr(g.usable)} mm` : "";
+  const combo = g.combo_scale != null && g.combo_scale < 1 ? `\n다른 변수와 함께 바꿀 때 위험 — 공통 비율 ×${Number(g.combo_scale.toFixed(2))} 로 추가 축소` : "";
+  if (g.state === "blocked") return { label: "막힘", kind: "warn", tip: `양쪽 모두 거의 움직일 수 없어 기본 체크를 해제했습니다${range ? `\n안전 범위 ${range}` : ""}${why ? `\n${why}` : ""}` };
+  return { label: g.state === "ok" || (g.combo_scale != null && g.combo_scale < 1) ? "조합 축소" : "축소", kind: "info", tip: `품질 점검으로 기본 범위를 줄였습니다${range ? `\n${range}` : ""}${why ? `\n${why}` : ""}${combo}` };
+}
+/** W 부분 꼬리표 툴팁: 구간 앵커·길이 비율 % */
+export function wPartialTip(anchors: number[] | null | undefined, cover: number | null | undefined): string {
+  const a = (anchors ?? []).map((x) => `#${x}`).join(" · ");
+  return `폭 정보가 있는 구간${a ? `: ${a}` : ""}${cover != null ? ` — 비드 길이의 ${(cover * 100).toFixed(0)} %` : ""}\n그 밖의 구간은 깊이만 바뀝니다`;
+}
+/** 폭 정보 없는 구간 툴팁(세그먼트 줄 `W —`, 비드 칩) */
+export function noWTip(anchors?: number[] | null): string {
+  return `폭 정보 없는 구간(입구 선 한쪽)${anchors?.length ? `: ${anchors.map((x) => `#${x}`).join(" · ")}` : ""} — 그 구간은 깊이만 바뀝니다`;
+}
+/** 그래프 비드의 W 부분 정보: derive 비드(w_segs) → graph 요약 비드 순. 부분이 아니면 null */
+export function wPartialOf(
+  bead: { w_segs?: number[] | null; w_cover?: number | null } | null | undefined,
+  graphBead: { segs: number[]; w_segs?: number[] | null; w_cover?: number | null } | null | undefined,
+): { wSegs: number[]; noW: number[]; cover: number | null; n: number } | null {
+  const w = bead?.w_segs ?? graphBead?.w_segs ?? null;
+  if (!w) return null;
+  const all = graphBead?.segs ?? [];
+  const noW = all.filter((x) => !w.includes(x));
+  return { wSegs: w, noW, cover: bead?.w_cover ?? graphBead?.w_cover ?? null, n: all.length || w.length };
+}
+/** 변수 행이 W 부분이면 {anchors, cover}(DoeParam.w_segs) */
+export const paramWPartial = (p: Pick<DoeParamRow, "type" | "w_segs" | "w_cover">) => (p.type === "W" && p.w_segs?.length ? { anchors: p.w_segs, cover: p.w_cover ?? null } : null);
+/** 메시 품질 미달 수치 한 줄(Fail 12.3 % · tria 21.9 %) */
+export const mqText = (q: { fail_ratio: number; tria_pct: number }) => `Fail ${(q.fail_ratio * 100).toFixed(1)} % · tria ${q.tria_pct.toFixed(1)} %`;
+/** 순위 행 ⚠ 툴팁(메시 품질): 수치 + 걸린 기준(기준값은 스냅샷 rank_quality — 없으면 수치만) */
+export function mqTip(q: DoeRankMq, rules?: DoeShapeRules | null): string {
+  const rq = rules?.mesh_route?.rank_quality;
+  const over = q.over ?? [];
+  const lim = (k: "fail" | "tria") => (rq ? ` > ${k === "fail" ? `${(rq.fail_ratio * 100).toFixed(0)} %` : `${rq.tria_pct} %`}` : "");
+  return `메시 품질 미달 — ${over.includes("fail") || !over.length ? `Fail ${(q.fail_ratio * 100).toFixed(1)} %${lim("fail")}` : ""}${(over.includes("fail") || !over.length) && over.includes("tria") ? " · " : ""}${over.includes("tria") ? `tria ${q.tria_pct.toFixed(1)} %${lim("tria")}` : ""} — 순위 신뢰도 낮음(순위는 유지)`;
+}
+/** MESH_QUALITY_RANK 결과 경고 문구(서버 문구가 없을 때) */
+export function meshQualityRankText(w: Record<string, unknown>): string {
+  if (w.scope === "base") return typeof w.fail_ratio === "number" && typeof w.tria_pct === "number" ? `기준 메시 품질 미달(${mqText({ fail_ratio: w.fail_ratio, tria_pct: w.tria_pct })}) — 모든 안이 같은 메시라 순위 신뢰도가 낮습니다(순위는 유지)` : "";
+  const sh = Array.isArray(w.shapes) ? (w.shapes as { name?: string; id?: string; fail_ratio: number; tria_pct: number }[]) : [];
+  return `메시 품질 미달 형상 ${typeof w.n === "number" ? w.n : sh.length}개${sh.length ? `(${sh.map((x) => `${x.name ?? x.id} ${mqText(x)}`).join(", ")})` : ""} — 순위 신뢰도 낮음(순위는 유지)`;
+}
+/** ④ 형상 행 메싱 경로 칩 문구·툴팁(완화 직행일 때만, 아니면 null) */
+export function routeChip(r: DoeShapeRoute | null | undefined): { label: string; tip: string } | null {
+  if (!r || r.path !== "cad_relaxed") return null;
+  const why = [r.reason.includes("faces") && r.n_faces != null ? `STEP 면 ${r.n_faces.toLocaleString()}${r.min_faces != null ? ` ≥ ${r.min_faces.toLocaleString()}` : ""}` : null, r.reason.includes("step_mb") && r.step_mb != null ? `STEP ${Number(r.step_mb.toFixed(1))} MB${r.min_step_mb != null ? ` ≥ ${r.min_step_mb} MB` : ""}` : null].filter(Boolean).join(" · ");
+  return { label: "완화 직행", tip: `큰 모델이라 cad 를 건너뛰고 완화 메싱(cad_relaxed)으로 바로 시작했습니다${why ? `\n${why}` : ""}` };
+}
 /** v0.16.1 판정 규칙 판 띠(§7.4) */
 export const RULES_OUTDATED_TEXT = "판정 규칙이 바뀌었습니다 — 다시 미리보기하면 경고 안도 실행됩니다";
 

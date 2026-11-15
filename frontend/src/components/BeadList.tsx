@@ -2,8 +2,8 @@
 // 지금 고치는 비드만 펼친다(1920 에서도 세로로 짧게). 숫자(D·W·사면·경고)는 마지막 [사면·경계 자동](서버 derive) 결과.
 // v0.17.0(esl_beadgraph.md §6.2): 그래프 스터디는 목록 위 [목록 | 트리] 토글. 그래프 비드 행 = ⑂ + 구성 세그먼트 수(칠하기 비드는 그대로).
 import { useState } from "react";
-import { isInfoWarn, warnText } from "../api/doe";
-import type { DoeBeadDerived, DoeSettingsOut } from "../api/types";
+import { isInfoWarn, noWTip, warnText, wPartialOf } from "../api/doe";
+import type { DoeBeadDerived, DoeSettingsOut, DoeShapeRules } from "../api/types";
 import { segColor, segLabel, repOf } from "../view3d/select/graph";
 import { counts, islandCount, type BeadMeta } from "../view3d/select/layers";
 import { RO_TIP, unknownRefs, type BeadSelectCtrl } from "./BeadSelectCard";
@@ -23,7 +23,7 @@ export function islandHoleText(x: DoeBeadDerived | null, localIslands: number | 
 
 export type ListView = "list" | "tree";
 
-export function BeadList({ ctrl, editable, st, hideDirty }: { ctrl: BeadSelectCtrl; editable: boolean; st: DoeSettingsOut | null; hideDirty?: boolean }) {
+export function BeadList({ ctrl, editable, st, hideDirty, shapeRules }: { ctrl: BeadSelectCtrl; editable: boolean; st: DoeSettingsOut | null; hideDirty?: boolean; shapeRules?: DoeShapeRules | null }) {
   const s = ctrl.state;
   const d = ctrl.derive;
   const [view, setView] = useState<ListView>("list");
@@ -52,7 +52,7 @@ export function BeadList({ ctrl, editable, st, hideDirty }: { ctrl: BeadSelectCt
           )}
         </div>
       )}
-      {tree && <SegmentTree ctrl={ctrl} editable={editable} />}
+      {tree && <SegmentTree ctrl={ctrl} editable={editable} wPartial={!!shapeRules?.w_partial} />}
       {!tree && s.beads.length === 0 && <div className="small muted">{graphOn ? "비드가 없습니다 — [+ 비드] 후 3D 에서 세그먼트를 클릭하거나 [트리]에서 체크하세요." : "비드가 없습니다 — [+ 비드] 후 3D 에서 바닥을 클릭하세요."}</div>}
       {!tree && s.beads.map((b, bi) => {
         if (b.src === "graph") return <GraphBeadRow key={b.id} ctrl={ctrl} b={b} bi={bi} ro={ro} />;
@@ -271,6 +271,8 @@ function GraphBeadRow({ ctrl, b, bi, ro }: { ctrl: BeadSelectCtrl; b: BeadMeta; 
   const infos = allw.filter((w) => isInfoWarn(w));
   const unknown = unknownRefs(gi, (b.segs ?? []).filter((r): r is { anchor: number } => "anchor" in r));
   const nets = (b.segs ?? []).filter((r) => "network" in r).length;
+  /** v0.21.0 W 부분(새 스냅샷만 — derive 비드에 w_segs 가 있을 때) */
+  const wp = wPartialOf(ctrl.derive?.beads.find((x) => x.id === b.id), db);
   return (
     <section className={`bs-bead${on ? " on" : ""}`} data-testid={`bead-${b.id}`} aria-current={on || undefined}>
       <header className="bs-bead-head" onClick={() => !on && ctrl.setActive(bi)}>
@@ -292,6 +294,11 @@ function GraphBeadRow({ ctrl, b, bi, ro }: { ctrl: BeadSelectCtrl; b: BeadMeta; 
           {db?.D_nom != null ? ` · D ${f1(db.D_nom)}` : ""}
           {db?.W_nom != null ? ` · W ${f1(db.W_nom)}` : ""}
         </span>
+        {wp && (
+          <span className="badge neutral" title={noWTip(wp.noW)} data-testid={`bead-wpart-${b.id}`}>
+            D · W(부분 {wp.wSegs.length}/{wp.n})
+          </span>
+        )}
         <button
           type="button"
           className="btn small ghost icon bs-del"
