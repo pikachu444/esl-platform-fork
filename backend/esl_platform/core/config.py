@@ -1004,6 +1004,68 @@ class BeadDoeLoadTransferCfg(_M):
         return self
 
 
+class BeadDoeShapeComboCfg(_M):
+    """v0.21.0 range guard 조합 점검(SH-12): 상호작용 묶음의 꼭짓점 공통 비율 이분."""
+
+    enabled: bool = True
+    full_max_vars: int = Field(default=4, ge=1, le=8)         # 이하면 2^k 꼭짓점 전부
+    samples: int = Field(default=16, ge=1, le=256)            # 넘으면 시드 0 표본 수
+    max_group: int = Field(default=8, ge=2, le=32)            # 묶음 상한(넘으면 RG_COMBO_SKIPPED)
+
+
+class BeadDoeShapeBudgetCfg(_M):
+    """v0.21.0 range guard 비용 상한(SH-17)."""
+
+    prep_timeout_s: float = Field(default=180, gt=0, le=3600)
+    matrix_timeout_s: float = Field(default=60, gt=0, le=3600)
+    max_evals: int = Field(default=4000, ge=1, le=1_000_000)
+    max_vars: int = Field(default=120, ge=1, le=2000)
+
+
+class BeadDoeShapeGuardCfg(_M):
+    """v0.21.0 항목 2 range guard(esl_bead_shape_v021.md §4·§6). 뒤집힘 각은 select.quality.flip_deg 를 해석 때 복사."""
+
+    enabled: bool = True
+    jac_min: float = Field(default=0.3, gt=0, lt=1)
+    tria_angle_min_deg: float = Field(default=10.0, gt=0, lt=60)
+    area_ratio_min: float = Field(default=0.2, gt=0, lt=1)
+    max_new_fail_ratio: float | None = Field(default=None, gt=0, le=1)
+    steps: int = Field(default=5, ge=1, le=20)
+    min_keep_frac: float = Field(default=0.25, ge=0, lt=1)
+    combo: BeadDoeShapeComboCfg = BeadDoeShapeComboCfg()
+    budget: BeadDoeShapeBudgetCfg = BeadDoeShapeBudgetCfg()
+
+
+class BeadDoeShapeRelaxedDirectCfg(_M):
+    """v0.21.0 항목 3 cad_relaxed 직행(SH-19): STEP 면 수·크기 기준(null = 그 기준 없음)."""
+
+    enabled: bool = True
+    min_faces: int | None = Field(default=1500, ge=1)
+    min_step_mb: float | None = Field(default=None, gt=0)
+
+
+class BeadDoeShapeRankQualityCfg(_M):
+    """v0.21.0 메시 품질 순위 경고 기준(SH-22): tria_pct null = compare.quality.tria_pct.fail."""
+
+    fail_ratio: float = Field(default=0.10, gt=0, le=1)
+    tria_pct: float | None = Field(default=None, gt=0, le=100)
+
+
+class BeadDoeShapeMeshRouteCfg(_M):
+    relaxed_direct: BeadDoeShapeRelaxedDirectCfg = BeadDoeShapeRelaxedDirectCfg()
+    rank_quality: BeadDoeShapeRankQualityCfg = BeadDoeShapeRankQualityCfg()
+
+
+class BeadDoeShapeRulesCfg(_M):
+    """v0.21.0 BEAD_SHAPE 형상 규칙(esl_bead_shape_v021.md §6). 새 스터디 스냅샷(doe.shape_rules)에만 쓰임 — 옛 스터디 = 키 없음 =
+    v0.20.0 동작. enabled false = 새 스터디도 스냅샷을 쓰지 않음."""
+
+    enabled: bool = True
+    w_partial: bool = True
+    range_guard: BeadDoeShapeGuardCfg = BeadDoeShapeGuardCfg()
+    mesh_route: BeadDoeShapeMeshRouteCfg = BeadDoeShapeMeshRouteCfg()
+
+
 class BeadDoeCompareLoadTransferRegionCfg(_M):
     """v0.20.0 ④ 평가 영역(LT-8, ③ SG-D-19 와 같은 값·뜻)."""
 
@@ -1298,6 +1360,7 @@ class BeadDoeCfg(_M):
     settings_cache_s: float = Field(default=300, ge=0)
     compare: BeadDoeCompareCfg = BeadDoeCompareCfg()
     load_transfer: BeadDoeLoadTransferCfg = BeadDoeLoadTransferCfg()   # v0.20.0 모든 모드 공통(esl_load_transfer.md §13.6)
+    shape_rules: BeadDoeShapeRulesCfg = BeadDoeShapeRulesCfg()         # v0.21.0 BEAD_SHAPE(esl_bead_shape_v021.md §6)
     select: BeadDoeSelectCfg = BeadDoeSelectCfg()            # v0.15.0 select(esl_bead_select.md §10)
     limits: BeadDoeLimitsCfg = BeadDoeLimitsCfg()
 
@@ -1750,6 +1813,7 @@ def bead_doe_settings(s: Settings | None) -> dict[str, Any]:
     _fill_missing(d.setdefault("select", {}), BeadDoeSelectCfg().model_dump())
     _fill_missing(d.setdefault("compare", {}), BeadDoeCompareCfg().model_dump())
     _fill_missing(d.setdefault("load_transfer", {}), BeadDoeLoadTransferCfg().model_dump())
+    _fill_missing(d.setdefault("shape_rules", {}), BeadDoeShapeRulesCfg().model_dump())   # v0.21.0
     _fill_missing(d.setdefault("rank", {}), BeadDoeRankCfg().model_dump())     # v0.20.0 SM 강성 지표 키(코어 병합 전에도)
     return d
 

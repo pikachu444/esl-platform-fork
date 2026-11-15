@@ -204,6 +204,17 @@ DEFAULTS: dict = {
                                "far_fail_frac": 0.2, "fail_dist_mm": 20.0, "fail_frac": 0.2},
                       "diag": {"enabled": True, "alt": True, "alt_cell_size_mm": 3.0, "alt_designs": "auto",
                                "cell_sweep_mm": [None, 10.0, 5.0, 3.0]}},
+    # v0.21.0 BEAD_SHAPE(esl_bead_shape_v021.md §6) — 비드 형상 규칙(W 구간별·range guard·cad 완화 직행·품질 순위 경고). 새 스터디
+    # 스냅샷(doe.shape_rules)에만 쓰임(키 없는 옛 스터디 = v0.20.0 동작). 기존 해시 대상 절을 건드리지 않는 최상위 새 절
+    # (pydantic BeadDoeShapeRulesCfg·두 yaml 거울 — 같은 이름). flip_deg 는 select.quality.flip_deg 를 해석 때 복사
+    "shape_rules": {"enabled": True, "w_partial": True,
+                    "range_guard": {"enabled": True, "jac_min": 0.3, "tria_angle_min_deg": 10.0, "area_ratio_min": 0.2,
+                                    "max_new_fail_ratio": None, "steps": 5, "min_keep_frac": 0.25,
+                                    "combo": {"enabled": True, "full_max_vars": 4, "samples": 16, "max_group": 8},
+                                    "budget": {"prep_timeout_s": 180, "matrix_timeout_s": 60, "max_evals": 4000,
+                                               "max_vars": 120}},
+                    "mesh_route": {"relaxed_direct": {"enabled": True, "min_faces": 1500, "min_step_mb": None},
+                                   "rank_quality": {"fail_ratio": 0.10, "tria_pct": None}}},
     # v0.15.0 비드 직접 선택(esl_bead_select.md §10). quality 의 기준값은 compare.quality 한 곳(복제 없음) —
     # 여기에는 차단 상한·뒤집힘 각만(백엔드 BeadDoeSelectCfg 거울 — 계약 없이 키 추가 금지).
     # v0.16.1(esl_select_relax.md §4.4): fixed_policy·quality.fail_policy = warn(경고만, 뒤집힘만 제외) | skip(v0.16.0 동작),

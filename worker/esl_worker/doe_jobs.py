@@ -338,7 +338,8 @@ def skipped_text(doe: dict[str, Any]) -> str:
 
 def _summary(out: dict[str, Any]) -> dict[str, Any]:
     keep = ("matrix_sha256", "n_designs", "n_beads", "n_params", "boundary", "part_id", "status", "design", "h",
-            "skipped")
+            "skipped",
+            "range_guard")          # v0.21.0 SH-18: 작업 결과 range_guard{entries, limited, blocked, combos, evals, seconds, stopped}(새 스냅샷만)
     s = {k: out.get(k) for k in keep if k in out}
     r = out.get("result")
     if isinstance(r, dict):

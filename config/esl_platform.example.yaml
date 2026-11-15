@@ -293,6 +293,22 @@ bead_doe:                             # v0.9.0 비드 형상 DOE(계약 esl_bead
       alt_cell_size_mm: 3.0           # 주 방식이 work 일 때 alt cell 의 셀 크기(null = 기존 격자)
       alt_designs: auto               # 안마다 다른 방식 점수 score_alt: auto(④ 켬·①②③ 끔) | on | off
       cell_sweep_mm: [null, 10.0, 5.0, 3.0]   # 베이스라인 셀 크기 훑기(참값 대비 변형만, 0 개 = 끔)
+  shape_rules:                        # v0.21.0 BEAD_SHAPE(계약 esl_bead_shape_v021.md §6) — 새 스터디 스냅샷 doe.shape_rules 원본(옛 스터디 = 키 없음 = v0.20.0 동작). 섹션 없으면 아래 기본
+    enabled: true                     # false = 새 스터디도 스냅샷을 쓰지 않음
+    w_partial: true                   # 항목 1 — 그래프 비드 W 를 폭 정보 있는 구간(S_W)에만
+    range_guard:                      # 항목 2 — 변수 기본 범위를 시험 모핑 + 요소 품질로 자동 축소(뒤집힘 각 flip_deg = select.quality.flip_deg 를 해석 때 복사)
+      enabled: true
+      jac_min: 0.3                    # quad 새 나쁜 야코비안 기준(공칭 >= 이 값 → 안 < 이 값 = 위반, 0..1)
+      tria_angle_min_deg: 10.0        # tria 새 나쁜 최소 내각(0..60)
+      area_ratio_min: 0.2             # 영향 요소 넓이 비 최소(0..1)
+      max_new_fail_ratio: null        # compare.quality 기준 새 Fail 비율 상한(null = 안 봄, 0..1]
+      steps: 5                        # 끝마다 이분 횟수(1..20)
+      min_keep_frac: 0.25             # 한쪽 남은 폭 비 < 이 값 = 그쪽 막힘(양쪽 → RG_VAR_BLOCKED, [0,1))
+      combo: {enabled: true, full_max_vars: 4, samples: 16, max_group: 8}   # 조합 점검: k <= full_max_vars 면 2^k 전부, 아니면 시드 0 표본 samples, 묶음 > max_group 건너뜀
+      budget: {prep_timeout_s: 180, matrix_timeout_s: 60, max_evals: 4000, max_vars: 120}   # 비용 상한(넘으면 RG_BUDGET — 남은 변수는 BD_MATRIX 가 점검)
+    mesh_route:                       # 항목 3
+      relaxed_direct: {enabled: true, min_faces: 1500, min_step_mb: null}   # STEP 면 수 >= min_faces(또는 크기 >= min_step_mb MB)면 cad 없이 cad_relaxed 직행(null = 그 기준 없음)
+      rank_quality: {fail_ratio: 0.10, tria_pct: null}   # 메시 품질 순위 경고(MESH_QUALITY_RANK, 순위 유지) — tria_pct null = compare.quality.tria_pct.fail
   select:                             # v0.15.0 비드 직접 선택·규칙 모핑(계약 esl_bead_select.md §10) — paicad 불필요(있으면 fixed-scan 만)
     enabled: true
     feature_angle_deg: 15.0           # 브라우저 확장·사면 BFS 평행 판정 기본(°, 1..45)
