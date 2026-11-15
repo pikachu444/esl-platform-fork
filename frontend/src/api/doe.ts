@@ -6,7 +6,7 @@ import type {
   DoeCheckIn, DoeCheckOut, DoeCompareCfg, DoeLoadTransferCfg, DoeLoadTransferDiag, DoeLoadTransferMethod, DoeLoadTransferSummary, DoeMeshAttempt, DoeMeshMethod, DoeMeshMode, DoeMeshPart, DoePrepShape, DoeShapeRef, DoeDesignStatus, DoeFileOut, DoeMatrixOut, DoeMethod, DoeMethodSources, DoeParam, DoeParamType, DoeParamsOut, DoePhase, DoePlanOut,
   DoePerEslOut, DoeRankRow, DoeResultOut, DoeScenario, DoeSettingsOut, DoeSpec, DoeStudyIn, DoeStudyOut, EntryOut,
   DoeFixedXferMethod, DoePrepFixedXfer, DoeWarning, DeleteCheckOut, DeleteOut,
-  DoeGuard, DoeParam as DoeParamRow, DoeRankMq, DoeShapeRoute, DoeShapeRules, DoeShapeRulesCfg, XY,
+  DoeGuard, DoeParam as DoeParamRow, DoeRankMq, DoeShapeRoute, DoeShapeRules, XY,
 } from "./types";
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -62,10 +62,8 @@ export function normalizeDoeSettings(raw: unknown): DoeSettingsOut {
     return Object.fromEntries(Object.keys(d).map((x) => [x, v[x] ?? d[x]])) as unknown as DoeSettingsOut[K];
   };
   const lt = normalizeLoadTransferCfg(r.load_transfer);
-  const sr = normalizeShapeRulesCfg(r.shape_rules);
   return {
     ...(lt ? { load_transfer: lt } : {}),
-    ...(sr ? { shape_rules: sr } : {}),
     enabled: r.enabled === true,
     reason: typeof r.reason === "string" ? r.reason : null,
     paicad: sub("paicad"),
@@ -83,19 +81,6 @@ export function normalizeDoeSettings(raw: unknown): DoeSettingsOut {
     compare: normalizeCompareCfg(r.compare, r),
     select: normalizeSelectCfg(r.select, r),
     select_reason: typeof r.select_reason === "string" ? r.select_reason : null,
-  };
-}
-
-/** v0.21.0 settings.shape_rules(표시용) — 서버가 줄 때만(없으면 키 없음 = 옛 서버) */
-function normalizeShapeRulesCfg(raw: unknown): DoeShapeRulesCfg | null {
-  if (!isObj(raw)) return null;
-  const g = isObj(raw.range_guard) ? raw.range_guard : {};
-  const rd = isObj(raw.mesh_route) && isObj(raw.mesh_route.relaxed_direct) ? raw.mesh_route.relaxed_direct : {};
-  return {
-    enabled: raw.enabled !== false,
-    w_partial: raw.w_partial === true,
-    range_guard: { enabled: g.enabled === true },
-    mesh_route: { relaxed_direct: { enabled: rd.enabled === true, min_faces: typeof rd.min_faces === "number" ? rd.min_faces : null } },
   };
 }
 

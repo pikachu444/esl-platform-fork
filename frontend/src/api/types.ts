@@ -2375,13 +2375,6 @@ export interface DoeRankCfg {
   /** R-SM-1 결정: 1차 범위 밖이라 재풀이 C 로 대체한 안 수(lin 결과만) */
   n_fallback?: number | null;
 }
-/** v0.21.0 GET /doe/settings shape_rules(esl_bead_shape_v021.md §6 — 표시용 일부. 옛 서버면 없음) */
-export interface DoeShapeRulesCfg {
-  enabled: boolean;
-  w_partial: boolean;
-  range_guard: { enabled: boolean };
-  mesh_route: { relaxed_direct: { enabled: boolean; min_faces: number | null } };
-}
 /** v0.21.0 스터디 스냅샷 shape_rules(§7 — DoeStudyOut.inputs.shape_rules. 옛 스터디 = 키 없음/null = v0.20.0 화면 그대로) */
 export interface DoeShapeRules {
   schema: number;
@@ -2430,8 +2423,6 @@ export interface DoeRankMq {
   over?: ("fail" | "tria")[] | null;
 }
 export interface DoeSettingsOut {
-  /** v0.21.0 형상 규칙 설정(표시용, 옛 서버면 없음) */
-  shape_rules?: DoeShapeRulesCfg | null;
   /** v0.20.0 순위 지표 설정(옛 서버면 없음) */
   rank?: DoeRankCfg | null;
   /** v0.20.0 하중 전달 설정 — 모든 모드 공통 최상위 칸(esl_load_transfer.md §13.6, 옛 서버면 없음 = select 숨김) */

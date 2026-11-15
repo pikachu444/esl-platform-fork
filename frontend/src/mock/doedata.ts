@@ -91,8 +91,6 @@ export function makeDoeSettings(): DoeSettingsOut {
   return {
     // v0.20.0 하중 전달(esl_load_transfer.md §13.6) — 모든 모드 공통 최상위 칸, 새 스터디 기본 work
     load_transfer: { method: exampleYaml("load_transfer", "method") as DoeLoadTransferMethod, cell_size_mm: exampleYaml("load_transfer", "cell_size_mm") as number | null, cell_choices_mm: exampleYaml("load_transfer", "cell_choices_mm") as (number | null)[], cell_min_mm: exampleYaml("load_transfer", "cell_min_mm") as number },
-    // v0.21.0 형상 규칙(esl_bead_shape_v021.md §6 — 표시용 일부)
-    shape_rules: { enabled: true, w_partial: true, range_guard: { enabled: true }, mesh_route: { relaxed_direct: { enabled: true, min_faces: MOCK_SHAPE_RULES.mesh_route.relaxed_direct.min_faces } } },
     rank: { metric: exampleYaml("rank", "metric") as DoeRankMetric, lin_form: exampleYaml("rank", "lin_form") as "ritz" | "taylor", lin_valid: exampleYaml("rank", "lin_valid") as number, imbalance_warn: exampleYaml("rank", "imbalance_warn") as number },
     enabled: true,
     reason: null,
