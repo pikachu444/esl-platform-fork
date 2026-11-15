@@ -9,7 +9,7 @@ worktree scratchpad/wt-210, 브랜치 release/v0.21.0, 계약 docs/contracts/esl
 - [x] 3 register.py·opt_core.py 계약 §12 소유 절
 - [x] 4 계약 §14 SH-28~32·R-SH-9·상태 확정
 - [x] 5 fe DoeSettingsShapeRules(check:api 통과)
-- [ ] 6 시험
+- [x] 6 시험 — 전체 통과(rel210/sum.log), vitest 단독 618 통과·기준 604 통과(fe 타임아웃 = 부하 환경)
 - [ ] 7 회귀
 - [~] 8 문서 — VERSION·버전 단언·openapi 0.21.0, CHANGELOG, decisions, FAQ 3건 완료, v210-* 인계 삭제(release 인계는 최종 커밋에서)
 - [ ] 9 최종 커밋·push
