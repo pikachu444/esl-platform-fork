@@ -1209,9 +1209,10 @@ def _cmp_input_mesh(c: Ctx, did: str, s: dict) -> dict:
             "size_mb": round(sum(f["size"] for f in files) / (1024 * 1024), 3)}
 
 
-def _cmp_text(code: str, **kw) -> str:
-    """'CODE: 문구'(resources/doe_messages.json 틀 — 자리 표시자 누락은 그대로 둠)."""
+def _cmp_text(_code: str, /, **kw) -> str:
+    """'CODE: 문구'(resources/doe_messages.json 틀 — 자리 표시자 누락은 그대로 둠). 코드는 위치 전용(틀의 {code} 자리 표시자 키워드와 충돌 없음)."""
     from esl.doe import load_messages
+    code = _code
     try:
         tpl = str(load_messages()["messages"].get(code) or code)
     except Exception:                                       # noqa: BLE001 - 문구 누락으로 실패하지 않음
@@ -4403,9 +4404,9 @@ def _rg_budget_info(doc: dict) -> str | None:
                      stopped=stopped or "evals")
 
 
-def _sel_text(code: str, **kw) -> str:
+def _sel_text(_code: str, /, **kw) -> str:
     """'CODE: 문구'(doe_messages 틀 — 자리 표시자 누락은 그대로)."""
-    return _cmp_text(code, **kw)
+    return _cmp_text(_code, **kw)
 
 
 def _sel_range_guard(c: Ctx, mesh: dict, fids, sd: str, echo, warns: list, info: list) -> dict:
