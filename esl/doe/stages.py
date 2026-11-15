@@ -44,6 +44,7 @@ from esl.doe import stiffness_metric as smm
 from esl.doe import transfer_plan as tp
 from esl.errors import EslError
 from esl.fsutil import atomic_replace
+from esl.mesh import route as mroute
 from esl.library import _util as U
 
 STAGES = ("bd_input", "bd_mesh0", "bd_loads", "bd_matrix", "bd_eval", "bd_post", "bd_select_grid")
@@ -1441,9 +1442,6 @@ def _route_of(c: Ctx, row: dict, ccfg: dict, mode: str) -> dict | None:
     근거). 그 밖(옛 스냅샷·mesh 형상·freeform·remesh) = None — 지금 경로 그대로. STEP 면 수는 gmsh 없이 본문 세기."""
     if _bs(c, "bs_route") == "none" or row.get("source") == "mesh" or mode not in ("auto", "cad"):
         return None
-    mroute = _mroute()
-    if mroute is None:                                  # 코어 esl.mesh.route 없음(통합 전) = 지금 경로 그대로
-        return None
     src = c.p(row["rel"])
     try:
         n_faces = mg.step_scan(src, ())["n_faces"]
@@ -2319,9 +2317,6 @@ def _cmp_mq_flags(c: Ctx, shapes: list[dict], res: dict) -> None:
     """v0.21.0 SH-22: 계획 열 bs_mq = shapes — 형상 행 mq{fail_ratio, tria_pct, over}(걸린 형상만, 순위 경고 근거 — compare.json 에 기록)."""
     if _bs(c, "bs_mq") != "shapes":
         return
-    mroute = _mroute()
-    if mroute is None:
-        return
     rq = _shape(c)["mesh_route"]["rank_quality"]
     for r in shapes:
         x = res.get(r["id"]) or {}
@@ -2616,27 +2611,6 @@ def _shape(c: Ctx) -> dict | None:
 def _bs(c: Ctx, col: str) -> str:
     """SH-2: 계획 표 열(bs_wpart·bs_guard·bs_route·bs_mq) 값. 새 스냅샷이 아니면 none(옛 스터디). 시나리오 이름으로 분기하지 않는다."""
     return str(_lt_plan(c)[col]) if _shape(c) is not None else "none"
-
-
-def _mroute():
-    """코어 ``esl.mesh.route``(경로 판정·품질 순위 판정 — impl-geom). 없으면 None(= 직행·순위 경고 없음, v0.20.0 동작)."""
-    try:
-        from esl.mesh import route as mroute
-    except ImportError:
-        return None
-    return mroute
-
-
-def _kwcall(fn, *args, **kw):
-    """함수가 받는 키워드만 넘겨 부름(계약 인터페이스가 아직 없는 옛 코어와도 호환 — 백엔드 ``_graph_call`` 과 같은 방식)."""
-    import inspect
-    try:
-        ps = inspect.signature(fn).parameters
-        if not any(p.kind is inspect.Parameter.VAR_KEYWORD for p in ps.values()):
-            kw = {k: v for k, v in kw.items() if k in ps}
-    except (TypeError, ValueError):
-        pass
-    return fn(*args, **kw)
 
 
 def _lt_ents(c: Ctx):
@@ -3581,9 +3555,6 @@ def _sel_mq_base(c: Ctx, inp: dict) -> dict | None:
     q = (inp.get("mesh") or {}).get("quality")
     if not isinstance(q, dict) or q.get("fail_ratio") is None:
         return None
-    mroute = _mroute()
-    if mroute is None:
-        return None
     fl = mroute.rank_flag(q, _shape(c)["mesh_route"]["rank_quality"])
     summ = {"fail_ratio": q["fail_ratio"], "tria_pct": q.get("tria_pct"), "warn": fl is not None}
     warning = None
@@ -4014,8 +3985,7 @@ def _sel_norm(c: Ctx, mesh: dict | None = None) -> tuple[dict, str]:
         if select_schema(c) != 2:
             raise EslError("SELECT_SCHEMA_MISMATCH", "schema 1 스터디에 schema 2 선택")
         graph, labels = _graph_or_none(c)                # GRAPH_FAILED: elems beads only
-        norm, sha = _kwcall(bgr.normalize_v2, s["input"], graph, c.cfg, labels=labels, mesh=mesh,
-                            **({"shape_rules": _shape(c)} if _shape(c) is not None else {}))
+        norm, sha = bgr.normalize_v2(s["input"], graph, c.cfg, labels=labels, mesh=mesh, shape_rules=_shape(c))
         if mesh is not None:
             bsel.check_elems(mesh, {"fixed_user": norm["fixed_user"], "exclude": norm["exclude"],
                                     "beads": [b for b in norm["beads"] if b["src"] == "elems"]})
@@ -4196,14 +4166,13 @@ def _sel_loads(c: Ctx, echo) -> dict:
     marks = None
     wall_isl = None
     rgrec = None                                 # v0.21.0 range guard 준비 기록(새 스냅샷만)
+    rg_go = False                                # v0.21.0 SH-13: seed(③ = _sel_auto_step) 뒤에 점검
     if select_schema(c) == 2:                    # v0.17.0 BG-D-40: 분류 그래프(schema 2 만 — schema 1 은 건너뜀, 바이트 불변)
         gst = _sel_graph(c, m, gfids, sd, warns, echo, step=step)
         if gst["ok"]:
             files += [f"prep/select/{x}" for x in (bgr_files())]
             if _bs(c, "bs_guard") == "basis" and (_shape(c) or {}).get("range_guard"):
-                rgrec = _sel_range_guard(c, m, gfids, sd, echo, warns, info)   # v0.21.0 SH-13: w_clamp.json 대신 range_guard.json
-                if rgrec.get("file"):
-                    files.append(rgrec["file"])
+                rg_go = True                     # v0.21.0 SH-13: w_clamp.json 대신 range_guard.json(아래 — seed 가 정해진 뒤)
             else:
                 wc = _sel_w_clamp(c, m, gfids, sd, echo)    # Verifier fix(§12 BG-X-1): 첫 행렬 전에 W 기본 범위 줄임표
                 if wc:
@@ -4230,6 +4199,14 @@ def _sel_loads(c: Ctx, echo) -> dict:
         auto = _sel_auto_v2(c, m, bmeta, gst, warns, echo) if gst is not None else _sel_auto(c, m, bmeta, warns, echo)
         if auto.get("file"):
             files.append(auto["file"])
+    if rg_go:                                    # 후보 seed: ③ = _sel_auto_step 파일(영역 밖 제외·fixed_user 포함), ①② = 코어 auto_seed
+        seed = None
+        if step and auto is not None and auto.get("file"):
+            seed = U.read_json(c.p(*auto["file"].split("/"))).get("selection")
+        rgrec = _sel_range_guard(c, m, fids, sd, echo, warns, info, seed=seed,
+                                 exclude_segs=(marks or {}).get("segments") if step else None)
+        if rgrec.get("file"):
+            files.append(rgrec["file"])
     inp = U.read_json(c.p("prep", "input.json"))
     fixed_rec = {"source": "none" if fw else "scan", "n": int(fixed.sum())}
     if step:
@@ -4391,7 +4368,7 @@ def _sel_w_clamp(c: Ctx, mesh: dict, fids, sd: str, echo) -> str | None:
     from esl.doe import bead_graph as bgr
     try:
         graph, labels = bgr.load_graph(c.p("prep"))
-        doc = bgr.w_clamp_table(mesh, graph, labels, fids, c.cfg)
+        doc = bgr.w_clamp_table(mesh, graph, labels, fids, c.cfg, shape_rules=_shape(c))   # v0.21.0: w_partial 이면 S_W 후보
     except EslError as exc:
         echo(f"[bd_loads] W 기본 범위 점검 건너뜀({exc.code})")
         return None
@@ -4400,24 +4377,9 @@ def _sel_w_clamp(c: Ctx, mesh: dict, fids, sd: str, echo) -> str | None:
     return f"prep/select/{bgr.W_CLAMP_JSON}"
 
 
-def _rg_counts(doc: dict) -> dict:
-    """진단 문서(esl/range_guard/1) → 요약 {entries, limited, blocked, combos, evals, stopped}(시간 값 없음)."""
-    ents = [e for e in doc.get("entries") or [] if isinstance(e, dict)]
-    bg = doc.get("budget") or {}
-    return {"entries": len(ents), "limited": sum(e.get("state") == "limited" for e in ents),
-            "blocked": sum(e.get("state") == "blocked" for e in ents), "combos": len(doc.get("combos") or []),
-            "evals": int(bg.get("evals") or 0), "stopped": bg.get("stopped")}
-
-
-def _rg_budget_info(doc: dict) -> str | None:
-    """남은 후보가 예산(시간·시험 수·변수 수)으로 건너뛰어졌으면 정보 RG_BUDGET 문구, 아니면 None."""
-    sk = [x for x in doc.get("skipped") or [] if isinstance(x, dict) and x.get("reason") == "budget"]
-    stopped = (doc.get("budget") or {}).get("stopped")
-    if not sk and not stopped:
-        return None
-    done = len(doc.get("entries") or [])
-    return _sel_text("RG_BUDGET", done=done, total=done + len(sk), evals=int((doc.get("budget") or {}).get("evals") or 0),
-                     stopped=stopped or "evals")
+def _rg_info_texts(ws: list) -> list[str]:
+    """코어 정보(``bead_graph.guard_info``·guard_selection 의 D.warnings — RG_BUDGET·RG_COMBO_SKIPPED) → 'CODE: 문구'."""
+    return [_sel_text(w["code"], **{k: v for k, v in w.items() if k not in ("code", "level")}) for w in ws]
 
 
 def _sel_text(_code: str, /, **kw) -> str:
@@ -4425,36 +4387,27 @@ def _sel_text(_code: str, /, **kw) -> str:
     return _cmp_text(_code, **kw)
 
 
-def _sel_range_guard(c: Ctx, mesh: dict, fids, sd: str, echo, warns: list, info: list) -> dict:
+def _sel_range_guard(c: Ctx, mesh: dict, fids, sd: str, echo, warns: list, info: list, *, seed: dict | None = None,
+                     exclude_segs=None) -> dict:
     """v0.21.0 SH-13 BD_LOADS(계획 열 bs_guard = basis): 그래프 변수 후보의 기본 범위를 시험 모핑 + 요소 품질로 미리 점검해
     prep/select/range_guard.json(스키마 esl/range_guard/1, scope prep) — derive(API·BD_MATRIX)가 이 표로 기본 범위·feasible 을
-    줄인다. 계산은 모드 무관 코어(``bead_graph.range_guard_table`` — esl.morph.range_guard 위). 실패(예외·코어 없음)해도 준비는 계속
-    (경고 RG_FAILED{code} — derive 는 전부 unchecked, BD_MATRIX 가 받침). 반환 {file|None, entries, limited, blocked, combos,
-    evals, stopped, seconds}(+ 실패 시 failed code)."""
+    줄인다. 계산은 모드 무관 코어(``bead_graph.range_guard_table`` — esl.morph.range_guard 위). fids = derive 가 쓰는 고정 노드
+    (``_sel_fixed_ids`` — 표 fixed_sha256 이 derive 와 같아야 적용), seed = ③ seed 정규화 선택(None = 코어 auto_seed).
+    계산 중 예외가 나도 준비는 계속(경고 RG_FAILED{code} — 표 없음, derive 는 전부 unchecked, BD_MATRIX 가 받침).
+    반환 = 코어 ``guard_result``{entries, limited, blocked, combos, evals, seconds, stopped} + file(| 실패 시 failed code)."""
     from esl.doe import bead_graph as bgr
-    sr = _shape(c)
     t0 = time.monotonic()
     try:
-        fn = getattr(bgr, "range_guard_table", None)
-        if fn is None:
-            raise EslError("RG_UNAVAILABLE", "range_guard_table 없음")
         graph, labels = bgr.load_graph(c.p("prep"))
-        doc = _kwcall(fn, mesh, graph, labels, fids, c.cfg, shape_rules=sr, scope="prep")
-        bgr.write_range_guard(os.path.join(sd, bgr.RANGE_GUARD_JSON), doc, guard=c.writer.guard)
-    except EslError as exc:
-        code = str(exc.code)
-        echo(f"[bd_loads] 변수 범위 품질 점검 건너뜀({code})")
-        warns.append(_sel_text("RG_FAILED", code=code))
-        return {"file": None, "failed": code, "seconds": round(time.monotonic() - t0, 3)}
+        doc = bgr.range_guard_table(mesh, graph, labels, fids, c.cfg, _shape(c), seed=seed, exclude_segs=exclude_segs)
     except Exception as exc:                      # noqa: BLE001 - 계산 실패가 준비를 막지 않음(SH-17)
-        code = type(exc).__name__
-        echo(f"[bd_loads] 변수 범위 품질 점검 실패({code}) — 범위 축소 없이 진행")
+        code = str(exc.code) if isinstance(exc, EslError) else type(exc).__name__
+        echo(f"[bd_loads] 변수 범위 품질 점검 실패({code}: {str(exc)[:200]}) — 범위 축소 없이 진행")
         warns.append(_sel_text("RG_FAILED", code=code))
         return {"file": None, "failed": code, "seconds": round(time.monotonic() - t0, 3)}
-    out = {"file": f"prep/select/{bgr.RANGE_GUARD_JSON}", **_rg_counts(doc), "seconds": round(time.monotonic() - t0, 3)}
-    bi = _rg_budget_info(doc)
-    if bi:
-        info.append(bi)
+    bgr.write_range_guard(os.path.join(sd, bgr.RANGE_GUARD_JSON), doc, guard=c.writer.guard)
+    out = {"file": f"prep/select/{bgr.RANGE_GUARD_JSON}", **bgr.guard_result(doc, time.monotonic() - t0)}
+    info += _rg_info_texts(bgr.guard_info(doc))
     echo(f"[bd_loads] 변수 범위 품질 점검: 점검 {out['entries']} · 줄임 {out['limited']} · 막힘 {out['blocked']} · 조합 "
          f"{out['combos']} · 시험 모핑 {out['evals']}회 · {out['seconds']:.1f}s" + (f" · 중단({out['stopped']})" if out["stopped"] else ""))
     return out
@@ -4507,7 +4460,7 @@ def _sel_auto_v2(c: Ctx, mesh: dict, bmeta: dict, gst: dict | None, warns: list,
         out["warnings"] += aw
         warns.append("AUTO_DETECT_FAILED: step=graph code=AUTO_BEAD_UNMAPPED")
         return out
-    norm, sha = bgr.normalize_v2(sel, graph, c.cfg, labels=labels, mesh=mesh)
+    norm, sha = bgr.normalize_v2(sel, graph, c.cfg, labels=labels, mesh=mesh, shape_rules=_shape(c))   # v0.21.0 SH-4(None = 옛 규칙)
     doc = bgr.auto_doc_v2(norm, sha, sym, hints, aw, mesh_sha256=bmeta["mesh_sha256"], graph_sha=gst["sha256"],
                           **({"fixed": fixed_rec} if fixed_rec is not None else {}))
     bgr.write_auto_v2(c.p("prep", "select", ba.AUTO_SELECTION_JSON), doc, guard=c.writer.guard)
@@ -4591,11 +4544,12 @@ def _sel_prepare(c: Ctx, t, echo) -> dict:
                                      mesh_sha256=bmeta["mesh_sha256"],
                                      w_clamp=_bgr().load_w_clamp(c.p("prep")) if graph is not None else None)
         else:                                   # v0.21.0 SH-13: 새 스냅샷 = range_guard 표(w_clamp.json 안 씀)
-            D = _kwcall(_bgr().derive_obj_v2, t.mesh, norm, c.cfg, graph, labels, fixed_node_ids=fids,
-                        mesh_sha256=bmeta["mesh_sha256"], shape_rules=sr,
-                        range_guard=_load_rg(c) if graph is not None and _bs(c, "bs_guard") == "basis" else None,
-                        w_clamp=(_bgr().load_w_clamp(c.p("prep")) if graph is not None and not sr.get("range_guard")
-                                 else None))
+            D = _bgr().derive_obj_v2(t.mesh, norm, c.cfg, graph, labels, fixed_node_ids=fids,
+                                     mesh_sha256=bmeta["mesh_sha256"], shape_rules=sr,
+                                     range_guard=(_bgr().load_range_guard(c.p("prep"))
+                                                  if graph is not None and _bs(c, "bs_guard") == "basis" else None),
+                                     w_clamp=(_bgr().load_w_clamp(c.p("prep"))
+                                              if graph is not None and not sr.get("range_guard") else None))
     else:
         D = bsel.derive_obj(t.mesh, norm, c.cfg, fixed_node_ids=fids, mesh_sha256=bmeta["mesh_sha256"],
                             with_section=False)
@@ -4603,7 +4557,7 @@ def _sel_prepare(c: Ctx, t, echo) -> dict:
     sr_g = _shape(c) if v2 else None
     rgd = None                                  # v0.21.0 select/<sha12>/range_guard.json 문서(새 스냅샷·guard 켬일 때만)
     if sr_g is not None and sr_g.get("range_guard") and _bs(c, "bs_guard") == "basis":
-        rgd = _sel_guard_selection(c, t, D, B, fids, sr_g, echo)         # SH-13: 보충 점검 + elems 변수 range_check 만
+        rgd = _sel_guard_selection(c, t, D, B, echo)                     # SH-13: 보충 점검 + elems 변수 range_check 만
         rc_w = rgd["rc_w"]
     else:
         rc_w = bsel.range_check(t.mesh, D, B, c.cfg)   # v0.16.1 SR-D-33: 기본 범위 끝 뒤집힘 → 비드 경고(범위·기저 불변)
@@ -4646,7 +4600,7 @@ def _sel_prepare(c: Ctx, t, echo) -> dict:
     out = {"params": tab, "warnings": warns, "rev_doc": _sel_rev(c, sha, bsha)}
     if rgd is not None and rgd.get("doc") is not None:       # v0.21.0 SH-13: select/<sha12>/range_guard.json(scope selection)
         _bgr().write_range_guard(os.path.join(d, _bgr().RANGE_GUARD_JSON), rgd["doc"], guard=c.writer.guard)
-        out["range_guard"] = {**_rg_counts(rgd["doc"]), "seconds": rgd["seconds"]}
+        out["range_guard"] = _bgr().guard_result(rgd["doc"], rgd["seconds"])
         if rgd.get("info"):
             out["info"] = list(rgd["info"])
     return out
@@ -4659,52 +4613,37 @@ def _bgr():
 
 def _prep_rg_sha(c: Ctx) -> str | None:
     """prep/select/range_guard.json 바이트 sha256(없으면 None) — select 기저 재사용 판정(v0.21.0)."""
-    p = c.p("prep", "select", _bgr().RANGE_GUARD_JSON) if hasattr(_bgr(), "RANGE_GUARD_JSON") else None
-    return U.sha256_file(p) if p and os.path.isfile(p) else None
+    p = c.p("prep", "select", _bgr().RANGE_GUARD_JSON)
+    return U.sha256_file(p) if os.path.isfile(p) else None
 
 
-def _load_rg(c: Ctx) -> dict | None:
-    """prep/select/range_guard.json(스키마 일치할 때만 — 코어 ``load_range_guard``). 없음·실패 = None(derive 는 unchecked)."""
-    fn = getattr(_bgr(), "load_range_guard", None)
-    if fn is None:
-        return None
-    try:
-        return fn(c.p("prep"))
-    except EslError:
-        return None
-
-
-def _sel_guard_selection(c: Ctx, t, D, B, fids, sr: dict, echo) -> dict:
+def _sel_guard_selection(c: Ctx, t, D, B, echo) -> dict:
     """v0.21.0 SH-13 BD_MATRIX 보충: (1) 그래프 변수 중 준비 표에 없는 것(guard.state unchecked)만 + 선택 전체 조합을 같은 코어 함수
-    (``bead_graph.guard_selection``)로 점검 → D 의 기본 범위에 반영(다음 행렬부터 보임 — 이번 행렬은 sha 고정), (2) elems 변수는
-    ``range_check(only=elems)``(SR-D-33 경고만, 범위 불변). 코어 함수가 없거나 실패하면 RG_FAILED 정보 없이 전부 unchecked 로 진행.
-    반환 {rc_w, doc|None, info[], seconds}."""
+    (``bead_graph.guard_selection`` — 규칙 = derive 가 D 에 둔 shape_rules)로 점검 → D 의 기본 범위에 반영(다음 행렬부터 보임 —
+    이번 행렬은 sha 고정), (2) elems 변수는 ``range_check(only=elems)``(SR-D-33 경고만, 범위 불변). 점검 중 예외가 나면 정보
+    RG_FAILED{code} 로 남기고 전부 unchecked 로 진행. 반환 {rc_w, doc|None, info[], seconds}."""
     from esl.doe import bead_select as bsel
     rows = bsel.params_table(D, c.cfg)
-    graph_names = sorted(r["name"] for r in rows if "guard" in r)
+    graph_names = [r["name"] for r in rows if "guard" in r]
     elem_names = [r["name"] for r in rows if "guard" not in r]
     unchecked = sorted(r["name"] for r in rows if (r.get("guard") or {}).get("state") == "unchecked")
     doc, info = None, []
     t0 = time.monotonic()
-    fn = getattr(_bgr(), "guard_selection", None)
-    if fn is not None and graph_names:
+    if graph_names:
+        n0 = len(D.warnings)
         try:
-            doc = _kwcall(fn, t.mesh, D, B, c.cfg, shape_rules=sr, fixed_node_ids=fids, only=unchecked,
-                          table=_load_rg(c))
-        except EslError as exc:
-            echo(f"[bd_matrix] 변수 범위 품질 점검 건너뜀({exc.code})")
-            info.append(_sel_text("RG_FAILED", code=str(exc.code)))
+            doc = _bgr().guard_selection(t.mesh, D, B, c.cfg, only=unchecked)
         except Exception as exc:                  # noqa: BLE001 - 계산 실패가 행렬을 막지 않음(SH-17)
-            echo(f"[bd_matrix] 변수 범위 품질 점검 실패({type(exc).__name__}) — 범위 축소 없이 진행")
-            info.append(_sel_text("RG_FAILED", code=type(exc).__name__))
+            code = str(exc.code) if isinstance(exc, EslError) else type(exc).__name__
+            echo(f"[bd_matrix] 변수 범위 품질 점검 실패({code}: {str(exc)[:200]}) — 범위 축소 없이 진행")
+            info.append(_sel_text("RG_FAILED", code=code))
+        info += _rg_info_texts([w for w in D.warnings[n0:] if isinstance(w, dict) and
+                                w.get("code") in ("RG_BUDGET", "RG_COMBO_SKIPPED")])
     if doc is not None:
-        bi = _rg_budget_info(doc)
-        if bi:
-            info.append(bi)
-        k = _rg_counts(doc)
+        k = _bgr().guard_result(doc)
         echo(f"[bd_matrix] 변수 범위 품질 점검(보충 {len(unchecked)}개): 줄임 {k['limited']} · 막힘 {k['blocked']} · 조합 "
              f"{k['combos']} · 시험 모핑 {k['evals']}회")
-    rc_w = _kwcall(bsel.range_check, t.mesh, D, B, c.cfg, only=elem_names)   # elems 변수만(SR-D-33 경고 — 범위 불변)
+    rc_w = bsel.range_check(t.mesh, D, B, c.cfg, only=elem_names)   # elems 변수만(SR-D-33 경고 — 범위 불변)
     return {"rc_w": rc_w, "doc": doc, "info": info, "seconds": round(time.monotonic() - t0, 3)}
 
 
@@ -4829,7 +4768,7 @@ def bd_select_grid(spec: dict, echo=print) -> dict:
     with open(c.writer.guard(os.path.join(gd, "cells", "nominal", "thumb.png")), "wb") as fh:
         fh.write(sr.render(x0, tris, None, None, view, V, tcfg, loops=L["loops"]))
     cells = []
-    usable = _guard_usable(c)                    # v0.21.0 SH-13 셀 경고용 {변수: [lo, hi]}(새 스냅샷만 — 없으면 빈 dict)
+    grows = _guard_rows(c)                       # v0.21.0 SH-13 셀 경고용 변수 행 guard(새 스냅샷만 — 없으면 [])
     for k, x in enumerate(designs):
         xd = bsel.morph(x0, L["B"], x["values"])
         cv = sr.color_values(x0, xd, direction, has)
@@ -4845,7 +4784,7 @@ def bd_select_grid(spec: dict, echo=print) -> dict:
                                                  "max_flip_deg", "fail_by")}}
         if st.get("warnings"):                   # v0.16.1 경고 안(READY — 실행·순위 대상, SR-D-1·11)
             cell["warnings"] = st["warnings"]
-        og = _outside_guard(x["values"], usable)
+        og = _bgr().outside_guard(grows, x["values"]) if grows else None
         if og:                                   # v0.21.0 SH-13: 점검된 안전 범위 밖 값(경고만 — 상태·판정 불변)
             cell["warnings"] = list(cell.get("warnings") or []) + [og]
         if st["fixed"]["violated"]:              # v0.16.1 SR-D-3: 침범 원인 = 침범이 있는 모든 칸(상태 무관)
@@ -4870,29 +4809,16 @@ def bd_select_grid(spec: dict, echo=print) -> dict:
             "selection_sha256": L["rev"]["selection_sha256"], "warnings": []}
 
 
-def _guard_usable(c: Ctx) -> dict[str, list[float]]:
-    """v0.21.0: 선택 기저 폴더 params.json 의 행 guard.usable(state limited|blocked) → {변수 이름: [lo, hi]}. 새 스냅샷·guard 켬이
-    아니거나 표가 없으면 {}."""
+def _guard_rows(c: Ctx) -> list[dict]:
+    """v0.21.0: 선택 기저 폴더 params.json 의 변수 행(guard 가 있는 행만 — 셀 경고 ``bead_graph.outside_guard`` 입력). 새 스냅샷·
+    guard 켬이 아니거나 읽을 수 없으면 []."""
     if _bs(c, "bs_guard") != "basis" or not (_shape(c) or {}).get("range_guard"):
-        return {}
+        return []
     try:
         pj = U.read_json(os.path.join(_sel_dir(c, _sel_rev_doc(c)["selection_sha256"]), "params.json"))
     except (OSError, ValueError, EslError):
-        return {}
-    out = {}
-    for r in pj.get("params") or []:
-        g = r.get("guard") if isinstance(r, dict) else None
-        if isinstance(g, dict) and g.get("state") in ("limited", "blocked") and isinstance(g.get("usable"), list) \
-                and len(g["usable"]) == 2:
-            out[str(r["name"])] = [float(g["usable"][0]), float(g["usable"][1])]
-    return out
-
-
-def _outside_guard(values: dict, usable: dict) -> dict | None:
-    """안 값이 점검된 usable 밖이면 셀 경고 {code: RG_OUTSIDE_GUARD, vars[{name, value, usable}]}(이름 정렬), 아니면 None."""
-    bad = [{"name": n, "value": float(values[n]), "usable": list(u)} for n, u in sorted(usable.items())
-           if n in values and not (u[0] - 1e-9 <= float(values[n]) <= u[1] + 1e-9)]
-    return {"code": "RG_OUTSIDE_GUARD", "vars": bad} if bad else None
+        return []
+    return [r for r in pj.get("params") or [] if isinstance(r, dict) and isinstance(r.get("guard"), dict)]
 
 
 def _sel_rad_files(c: Ctx, nid: np.ndarray) -> list[tuple[str, str]]:

@@ -181,7 +181,7 @@ def test_shape_plan_columns_and_resolve():
 def test_stages_read_shape_columns_only():
     """SH-2: 형상 규칙 호출 쪽(stages·step_graph)은 계획 열 값만 읽고 시나리오 이름으로 분기하지 않는다(코드 검사)."""
     for fn in (stg._route_of, stg._bs, stg._cmp_mq_flags, stg._cmp_mq_rank, stg._sel_mq_base, stg._sel_range_guard,
-               stg._sel_guard_selection, stg._guard_usable):
+               stg._sel_guard_selection, stg._guard_rows):
         src = inspect.getsource(fn)
         assert not re.search(r"c\.scn\b|scenario\s*==|select_base\(", src), fn.__name__
     assert "bs_route" in inspect.getsource(stg._route_of) and "bs_mq" in inspect.getsource(stg._cmp_mq_rank)

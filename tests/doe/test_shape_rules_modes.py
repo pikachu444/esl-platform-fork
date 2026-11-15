@@ -1,10 +1,8 @@
 """v0.21.0 BEAD_SHAPE 모드별 단계 시험(esl_bead_shape_v021.md V-SH-12·13) — 새 스냅샷(doe.shape_rules) 의 ①②③ select 준비·행렬과
-④ 형상 경로. 모드 차이는 계획 표 열(bs_*)로만(시나리오 이름 분기 없음). impl-geom 코어(range_guard_table·guard_selection·
-route.choose·rank_flag)는 통합 전이라 시험에서 스텁으로 끼움(monkeypatch raising=False — 실제 코어가 있으면 그 위에 덮어씀)."""
+④ 형상 경로. 모드 차이는 계획 표 열(bs_*)로만(시나리오 이름 분기 없음). 코어(range_guard_table·guard_selection·route)는 실제
+모듈 — 감시자(spy)는 실제 함수를 그대로 부르며 인수만 기록한다(스텁 없음). 실패 주입은 soft-fail 시험에서만."""
+import hashlib
 import json
-import os
-import sys
-import types
 
 import pytest
 from _bg_util import cf, esl_mesh
@@ -14,11 +12,12 @@ from esl.doe import bead_select as bsel
 from esl.doe import stages as stg
 from esl.doe import transfer_plan as tp
 from esl.errors import EslError
+from esl.mesh import route as mroute
 
-RG_JSON = "range_guard.json"
+RG_JSON = bgr.RANGE_GUARD_JSON
 
 
-# ---------------------------------------------------------------- 코어 스텁(통합 전 impl-geom 접점)
+# ---------------------------------------------------------------- 감시자(실제 코어 호출 + 인수 기록)
 class Spy:
     def __init__(self):
         self.calls: dict[str, list] = {}
@@ -29,61 +28,27 @@ class Spy:
     def n(self, name):
         return len(self.calls.get(name, []))
 
+    def last(self, name):
+        return self.calls[name][-1]
+
 
 @pytest.fixture
 def core(monkeypatch):
-    """range_guard_table·write/load_range_guard·guard_selection 스텁 + derive/params_rows/range_check 감시자."""
+    """bead_graph·bead_select 접점 함수를 실제 함수로 부르는 감시자로 감쌈(인수·반환 기록)."""
     spy = Spy()
-    monkeypatch.setattr(bgr, "RANGE_GUARD_JSON", RG_JSON, raising=False)
 
-    def table(mesh, graph, labels, fids, cfg, *, shape_rules=None, scope="prep"):
-        spy.rec("range_guard_table", shape_rules=shape_rules, scope=scope)
-        names = sorted(g["name"] for g in (getattr(graph, "beads", None) or []) if isinstance(g, dict)) or ["B1_D"]
-        return {"schema": "esl/range_guard/1", "scope": scope,
-                "entries": [{"name": n, "state": "limited", "usable": [6.0, 8.0]} for n in names[:1]],
-                "combos": [], "skipped": [], "budget": {"evals": 7, "stopped": None}}
+    def wrap(mod, name):
+        real = getattr(mod, name)
 
-    def write(path, doc, guard=None):
-        spy.rec("write_range_guard", path=path)
-        with open(guard(path) if guard else path, "w", encoding="utf-8") as fh:
-            json.dump(doc, fh, sort_keys=True)
-
-    def load(prep_dir):
-        p = os.path.join(prep_dir, "select", RG_JSON)
-        if not os.path.isfile(p):
-            return None
-        with open(p, encoding="utf-8") as fh:
-            return json.load(fh)
-
-    def gsel(mesh, D, B, cfg, *, shape_rules=None, fixed_node_ids=None, only=None, table=None):
-        spy.rec("guard_selection", only=list(only or []), table=table is not None, shape_rules=shape_rules)
-        return {"schema": "esl/range_guard/1", "scope": "selection", "entries": [], "combos": [], "skipped": [],
-                "budget": {"evals": 3, "stopped": None}}
-    monkeypatch.setattr(bgr, "range_guard_table", table, raising=False)
-    monkeypatch.setattr(bgr, "write_range_guard", write, raising=False)
-    monkeypatch.setattr(bgr, "load_range_guard", load, raising=False)
-    monkeypatch.setattr(bgr, "guard_selection", gsel, raising=False)
-
-    real_derive, real_rows, real_rc = bgr.derive_obj_v2, bgr.params_rows_v2, bsel.range_check
-
-    def derive(mesh, norm, cfg, graph, labels, *, fixed_node_ids=None, mesh_sha256=None, w_clamp=None, range_guard=None,
-               shape_rules=None):
-        spy.rec("derive", range_guard=range_guard, shape_rules=shape_rules, w_clamp=w_clamp)
-        return real_derive(mesh, norm, cfg, graph, labels, fixed_node_ids=fixed_node_ids, mesh_sha256=mesh_sha256,
-                           w_clamp=w_clamp)
-
-    def rows(D, cfg=None):
-        out = real_rows(D, cfg)
-        for i, r in enumerate(out):                     # 코어 행 키 guard(통합 후엔 코어가 채움)
-            r.setdefault("guard", {"state": "unchecked" if i == 0 else "ok"})
-        return out
-
-    def rcheck(mesh, D, B, cfg, only=None):
-        spy.rec("range_check", only=only)
-        return real_rc(mesh, D, B, cfg)
-    monkeypatch.setattr(bgr, "derive_obj_v2", derive)
-    monkeypatch.setattr(bgr, "params_rows_v2", rows)
-    monkeypatch.setattr(bsel, "range_check", rcheck)
+        def f(*a, **kw):
+            r = real(*a, **kw)
+            spy.rec(name, *a, **kw)
+            spy.calls[name][-1] = (a, kw, r)
+            return r
+        monkeypatch.setattr(mod, name, f)
+    for n in ("range_guard_table", "guard_selection", "derive_obj_v2", "w_clamp_table", "load_range_guard"):
+        wrap(bgr, n)
+    wrap(bsel, "range_check")
     return spy
 
 
@@ -116,88 +81,153 @@ def _prep(tmp_path, **extra):
     return mesh, doe, out, run, msgs
 
 
+def _auto(out):
+    return json.loads((out / "prep" / "select" / "auto_selection.json").read_text(encoding="utf-8"))
+
+
 SPEC = {"method": "lhs", "n": 3, "seed": 1, "params": [{"name": "B1_D", "lo": 6.0, "hi": 10.0}]}
+NEW = {"schema": 1}
 
 
 # ---------------------------------------------------------------- V-SH-12
 def test_new_snapshot_loads_writes_range_guard_not_w_clamp(tmp_path, core):
-    """BD_LOADS(① 열 bs_guard basis): 새 스냅샷 = range_guard.json(스키마 esl/range_guard/1, scope prep), w_clamp.json 안 씀,
-    결과 range_guard 요약(시간 값은 seconds 만)."""
-    _m, _d, out, run, _ = _prep(tmp_path, shape_rules={"schema": 1})
+    """BD_LOADS(① 열 bs_guard basis): 새 스냅샷 = 실제 range_guard_table → range_guard.json(스키마 esl/range_guard/1, scope prep),
+    w_clamp.json 안 씀, 결과 range_guard 요약 = 코어 guard_result, RG_FAILED 없음(접점 시그니처 정합)."""
+    _m, _d, out, run, _ = _prep(tmp_path, shape_rules=NEW)
     r = run("bd_loads")
     sd_ = out / "prep" / "select"
     assert (sd_ / RG_JSON).is_file() and not (sd_ / "w_clamp.json").exists()
-    assert json.loads((sd_ / RG_JSON).read_text(encoding="utf-8"))["scope"] == "prep"
-    assert r["range_guard"]["entries"] == 1 and r["range_guard"]["limited"] == 1 and r["range_guard"]["evals"] == 7
+    doc = json.loads((sd_ / RG_JSON).read_text(encoding="utf-8"))
+    assert doc["schema"] == bgr.RANGE_GUARD_SCHEMA and doc["scope"] == "prep" and doc["entries"]
+    assert not any(str(w).startswith("RG_FAILED") for w in r["warnings"]), r["warnings"]
+    assert "failed" not in r["range_guard"] and r["range_guard"] == {**bgr.guard_result(doc), "seconds": r["range_guard"]["seconds"]}
     assert f"prep/select/{RG_JSON}" in r["files"]
-    sr = core.calls["range_guard_table"][0][1]["shape_rules"]
-    assert sr["range_guard"]["jac_min"] == 0.3 and sr["w_partial"] is True and core.calls["range_guard_table"][0][1]["scope"] == "prep"
+    a, kw, _ = core.last("range_guard_table")
+    sr = a[5]                                               # 6번째 위치 인수 = 해석된 shape_rules
+    assert sr["range_guard"]["jac_min"] == 0.3 and sr["w_partial"] is True and kw["seed"] is None   # ① = 코어 auto_seed
+    inp = json.loads((out / "prep" / "input.json").read_text(encoding="utf-8"))
+    assert inp["range_guard"]["entries"] == len(doc["entries"])
 
 
 def test_legacy_snapshot_unchanged(tmp_path, core):
-    """키 없는 스냅샷 = v0.20.0: range_guard_table·guard_selection 안 부름, range_guard.json·결과 키 없음, basis.json 에 새 키 없음."""
+    """키 없는 스냅샷 = v0.20.0: range_guard_table·guard_selection 안 부름, range_guard.json·결과 키 없음, basis.json 에 새 키 없음,
+    range_check 는 모든 변수(only=None)."""
     _m, doe, out, run, _ = _prep(tmp_path)
     r = run("bd_loads")
     assert core.n("range_guard_table") == 0 and "range_guard" not in r
     assert not (out / "prep" / "select" / RG_JSON).exists()
-    auto = json.loads((out / "prep" / "select" / "auto_selection.json").read_text(encoding="utf-8"))
-    sel = auto["selection"]
-    doe["selection"] = {"rev": 1, "sha256": auto["sha256"], "input": sel}
+    assert core.last("w_clamp_table")[1]["shape_rules"] is None
+    auto = _auto(out)
+    doe["selection"] = {"rev": 1, "sha256": auto["sha256"], "input": auto["selection"]}
     run("bd_matrix", rev=1, spec=SPEC, selection=doe["selection"])
     assert core.n("guard_selection") == 0
     d = out / "select" / auto["sha256"][:12]
     bj = json.loads((d / "basis.json").read_text(encoding="utf-8"))
     assert "shape_rules" not in bj and "range_guard_sha256" not in bj and not (d / RG_JSON).exists()
-    assert all(c[1]["shape_rules"] is None and c[1]["range_guard"] is None for c in core.calls["derive"])
+    kw = core.last("derive_obj_v2")[1]                       # BD_MATRIX derive = v0.20.0 호출 그대로
+    assert "shape_rules" not in kw and "range_guard" not in kw
+    assert core.last("range_check")[1].get("only") is None
+    rows = json.loads((d / "params.json").read_text(encoding="utf-8"))["params"]
+    assert rows and not any("guard" in x for x in rows)
 
 
 def test_matrix_uses_prep_table_and_supplements(tmp_path, core):
-    """BD_MATRIX: derive 가 준비 표(range_guard)·shape_rules 를 받음, 표에 없는 unchecked 변수·조합은 guard_selection 으로 보충 →
-    select/<sha12>/range_guard.json(scope selection), params.json 행에 guard, basis.json shape_rules·range_guard_sha256,
-    elems 변수는 range_check(only=)로 경고만, 같은 sha 재사용(점검표가 같으면)."""
-    _m, doe, out, run, msgs = _prep(tmp_path, shape_rules={"schema": 1})
+    """BD_MATRIX: derive 가 준비 표·shape_rules 를 받아 seed 변수에 적용(unchecked 아님 — 표 머리 graph·cfg·fixed·exclude sha 가
+    derive 와 같음), API derive(derive_v2) 도 같은 표 적용, guard_selection 보충 → select/<sha12>/range_guard.json(scope selection),
+    params.json 그래프 행 guard, basis.json shape_rules·range_guard_sha256, elems 변수만 range_check(only=), 같은 sha 재사용."""
+    m, doe, out, run, msgs = _prep(tmp_path, shape_rules=NEW)
     run("bd_loads")
-    auto = json.loads((out / "prep" / "select" / "auto_selection.json").read_text(encoding="utf-8"))
+    auto = _auto(out)
     sha = auto["sha256"]
     doe["selection"] = {"rev": 1, "sha256": sha, "input": auto["selection"]}
     r = run("bd_matrix", rev=1, spec=SPEC, selection=doe["selection"])
     prep_doc = json.loads((out / "prep" / "select" / RG_JSON).read_text(encoding="utf-8"))
-    kw = core.calls["derive"][-1][1]
-    assert kw["range_guard"] == prep_doc and kw["shape_rules"]["schema"] == 1 and kw["w_clamp"] is None     # w_clamp.json 안 읽음
+    a, kw, D = core.last("derive_obj_v2")
+    assert kw["range_guard"] == prep_doc and kw["shape_rules"]["schema"] == 1 and kw["w_clamp"] is None
+    rows0 = bgr.params_rows_v2(D)
+    assert rows0 and all(x["guard"]["state"] != "unchecked" for x in rows0 if "guard" in x), \
+        [(x["name"], x["guard"]) for x in rows0]                     # 준비 표가 seed 변수 전부에 맞음
+    g, lab = bgr.load_graph(str(out / "prep"))
+    cfg = a[2]                                               # derive_obj_v2 위치 인수 cfg
+    norm, _ = bgr.normalize_v2(auto["selection"], g, cfg, labels=lab, mesh=m, shape_rules=kw["shape_rules"])
+    api = bgr.derive_v2(a[0], norm, cfg, g, lab, fixed_scan=(), range_guard=bgr.load_range_guard(str(out / "prep")),
+                        shape_rules=kw["shape_rules"])
+    assert [x.get("guard") for x in api["params"]] == [x.get("guard") for x in rows0]   # API derive = BD_MATRIX derive
     d = out / "select" / sha[:12]
-    assert json.loads((d / RG_JSON).read_text(encoding="utf-8"))["scope"] == "selection"
-    gs = core.calls["guard_selection"][-1][1]
-    assert gs["only"] == sorted(gs["only"]) and gs["table"] is True and r["range_guard"]["evals"] == 3
+    sel_doc = json.loads((d / RG_JSON).read_text(encoding="utf-8"))
+    assert sel_doc["scope"] == "selection" and sel_doc["selection_sha256"] == sha
+    assert r["range_guard"] == bgr.guard_result(sel_doc, r["range_guard"]["seconds"])
+    assert core.last("guard_selection")[1]["only"] == []                # 모두 표에 맞음 → 단일 보충 없음(조합만)
     bj = json.loads((d / "basis.json").read_text(encoding="utf-8"))
-    import hashlib
     assert bj["shape_rules"] == 1 and bj["range_guard_sha256"] == hashlib.sha256(
         (out / "prep" / "select" / RG_JSON).read_bytes()).hexdigest()
     rows = json.loads((d / "params.json").read_text(encoding="utf-8"))["params"]
     assert rows and all("guard" in x for x in rows)
-    assert core.calls["range_check"][-1][1]["only"] is not None            # elems 변수만(그래프 변수 제외)
+    assert core.last("range_check")[1]["only"] == []                   # elems 변수만(그래프 변수 제외)
     msgs.clear()
     run("bd_matrix", rev=2, spec=SPEC, selection=doe["selection"])
     assert any("재사용" in s for s in msgs)
-    # 준비 점검표가 바뀌면(sha 불일치) 다시 계산
     (out / "prep" / "select" / RG_JSON).write_text(json.dumps({**prep_doc, "entries": []}, sort_keys=True), encoding="utf-8")
     msgs.clear()
+    n0 = core.n("guard_selection")
     run("bd_matrix", rev=3, spec=SPEC, selection=doe["selection"])
     assert not any("재사용" in s for s in msgs)
+    assert core.n("guard_selection") == n0 + 1 and core.last("guard_selection")[1]["only"]   # 표 비면 unchecked 보충
 
 
-def test_guard_core_failure_is_soft(tmp_path, core, monkeypatch):
-    """코어 점검 실패(예외)·코어 없음 → 준비는 계속, 경고 RG_FAILED, range_guard.json 없음(derive 는 unchecked)."""
+def test_select_grid_outside_guard(tmp_path, core):
+    """BD_SELECT_GRID: 안 값이 변수 행 guard.usable 밖이면 셀 경고 RG_OUTSIDE_GUARD(경고만 — 상태 불변), 안이면 없음."""
+    _m, doe, out, run, _ = _prep(tmp_path, shape_rules=NEW)
+    run("bd_loads")
+    auto = _auto(out)
+    doe["selection"] = {"rev": 1, "sha256": auto["sha256"], "input": auto["selection"]}
+    run("bd_matrix", rev=1, spec=SPEC, selection=doe["selection"])
+    rows = json.loads((out / "select" / auto["sha256"][:12] / "params.json").read_text(encoding="utf-8"))["params"]
+    r0 = next(x for x in rows if (x.get("guard") or {}).get("usable"))
+    u = r0["guard"]["usable"]
+    mx = json.loads((out / "doe" / "1" / "matrix.json").read_text(encoding="utf-8"))
+    k = next(i for i, x in enumerate(mx["designs"]) if x["id"] != stg.BASELINE)
+    mx["designs"][k]["values"] = {**mx["designs"][k]["values"], r0["name"]: float(u[1]) + 0.5}
+    (out / "doe" / "1" / "matrix.json").write_text(json.dumps(mx), encoding="utf-8")
+    run("bd_select_grid", rev=1)
+    man = json.loads((out / "doe" / "1" / "grid" / "grid_manifest.json").read_text(encoding="utf-8"))
+    c0 = next(x for x in man["cells"] if x["id"] == mx["designs"][k]["id"])
+    og = [w for w in c0.get("warnings") or [] if isinstance(w, dict) and w.get("code") == "RG_OUTSIDE_GUARD"]
+    assert og and og[0]["vars"][0]["name"] == r0["name"]
+    assert bgr.outside_guard(rows, {r0["name"]: float(u[0])}) is None
+
+
+def test_guard_core_failure_is_soft(tmp_path, monkeypatch):
+    """코어 점검 중 실제 예외(주입) → 준비는 계속, 경고 RG_FAILED{code}, range_guard.json 없음(derive 는 unchecked)."""
     def boom(*a, **k):
         raise ValueError("x")
-    monkeypatch.setattr(bgr, "range_guard_table", boom, raising=False)
-    _m, _d, out, run, _ = _prep(tmp_path, shape_rules={"schema": 1})
+    monkeypatch.setattr(bgr, "range_guard_table", boom)
+    _m, _d, out, run, _ = _prep(tmp_path, shape_rules=NEW)
     r = run("bd_loads")
     assert not (out / "prep" / "select" / RG_JSON).exists()
     assert r["range_guard"]["failed"] == "ValueError" and "entries" not in r["range_guard"]
     assert any(str(w).startswith("RG_FAILED") and "ValueError" in str(w) for w in r["warnings"])
-    monkeypatch.delattr(bgr, "range_guard_table")                   # 코어 없음 = AttributeError 대신 RG_UNAVAILABLE
-    r2 = _runner(tmp_path, _d)[1]("bd_loads")
-    assert any(str(w).startswith("RG_FAILED") for w in r2["warnings"])
+
+
+def test_interface_signatures_bind():
+    """접점 정합: 백엔드·단계가 부르는 형태가 코어 실제 시그니처에 묶임(조용히 빠지는 키워드 없음)."""
+    import inspect
+    bind = [(bgr.range_guard_table, (1, 2, 3, 4, 5, 6), {"seed": None, "exclude_segs": None}),
+            (bgr.guard_selection, (1, 2, 3, 4), {"only": []}),
+            (bgr.derive_obj_v2, (1, 2, 3, 4, 5), {"fixed_node_ids": (), "mesh_sha256": None, "shape_rules": None,
+                                                  "range_guard": None, "w_clamp": None}),
+            (bgr.derive_v2, (1, 2, 3, 4, 5), {"frame": None, "fixed_scan": (), "bead": None, "w_clamp": None,
+                                              "range_guard": None, "shape_rules": None}),
+            (bgr.normalize_v2, (1, 2, 3), {"labels": None, "mesh": None, "shape_rules": None}),
+            (bgr.w_clamp_table, (1, 2, 3, 4, 5), {"shape_rules": None}),
+            (bgr.write_range_guard, (1, 2), {"guard": None}), (bgr.load_range_guard, (1,), {}),
+            (bgr.guard_result, (1, 2), {}), (bgr.guard_info, (1,), {}), (bgr.outside_guard, (1, 2), {}),
+            (bsel.range_check, (1, 2, 3, 4), {"only": []}),
+            (mroute.choose, (1, 2, 3), {"relaxed_enabled": True}), (mroute.rank_flag, (1, 2), {})]
+    for fn, a, kw in bind:
+        inspect.signature(fn).bind(*a, **kw)
+    for name in ("_mroute", "_kwcall"):                     # 통합 전 대체 경로 제거됨
+        assert not hasattr(stg, name)
 
 
 def test_columns_drive_behavior(tmp_path, core, monkeypatch):
@@ -207,23 +237,27 @@ def test_columns_drive_behavior(tmp_path, core, monkeypatch):
         assert tp.PLANS[pid]["bs_guard"] == "basis" and tp.PLANS[pid]["bs_wpart"] == "graph"
     saved = dict(tp.PLANS["case_once"])
     monkeypatch.setitem(tp.PLANS, "case_once", dict(saved, bs_guard="none"))
-    _m, _d, out, run, _ = _prep(tmp_path, shape_rules={"schema": 1})
+    _m, _d, out, run, _ = _prep(tmp_path, shape_rules=NEW)
     run("bd_loads")
     assert core.n("range_guard_table") == 0 and not (out / "prep" / "select" / RG_JSON).exists()
 
 
 def test_range_guard_off_uses_legacy_w_clamp(tmp_path, core):
-    """shape_rules.range_guard.enabled false → 점검표 없음, W 기본 범위는 v0.20.0 w_clamp 표 경로(derive 가 w_clamp 를 받음)."""
+    """shape_rules.range_guard.enabled false → 점검표 없음, W 기본 범위는 w_clamp 표 경로(w_partial 이면 S_W 후보 — shape_rules 전달),
+    derive 가 w_clamp 를 받음."""
     _m, doe, out, run, _ = _prep(tmp_path, shape_rules={"schema": 1, "range_guard": {"enabled": False}})
     run("bd_loads")
     assert core.n("range_guard_table") == 0 and not (out / "prep" / "select" / RG_JSON).exists()
-    auto = json.loads((out / "prep" / "select" / "auto_selection.json").read_text(encoding="utf-8"))
+    assert core.last("w_clamp_table")[1]["shape_rules"]["w_partial"] is True
+    auto = _auto(out)
     doe["selection"] = {"rev": 1, "sha256": auto["sha256"], "input": auto["selection"]}
     run("bd_matrix", rev=1, spec=SPEC, selection=doe["selection"])
-    assert core.n("guard_selection") == 0 and core.calls["derive"][-1][1]["range_guard"] is None
+    kw = core.last("derive_obj_v2")[1]
+    assert core.n("guard_selection") == 0 and kw["range_guard"] is None
+    assert kw["w_clamp"] == bgr.load_w_clamp(str(out / "prep"))
 
 
-def test_invalid_block_config_invalid(tmp_path, core):
+def test_invalid_block_config_invalid(tmp_path):
     """잘못된 스냅샷 블록 → CONFIG_INVALID(준비 첫 단계에서)."""
     mesh = esl_mesh(cf.load_fixture("h5"))
     doe = _study(tmp_path, mesh, shape_rules={"range_guard": {"jac_min": 2}})
@@ -234,56 +268,51 @@ def test_invalid_block_config_invalid(tmp_path, core):
     assert ei.value.code == "CONFIG_INVALID"
 
 
-def test_outside_guard_cell_warning():
-    """셀 경고 RG_OUTSIDE_GUARD: 점검된 usable 밖 값만, 이름 정렬, 경계값(1e-9 허용)은 통과."""
-    usable = {"B2_D": [6.0, 8.0], "B1_D": [1.0, 2.0]}
-    assert stg._outside_guard({"B1_D": 1.5, "B2_D": 8.0}, usable) is None
-    w = stg._outside_guard({"B2_D": 9.0, "B1_D": 0.5, "X": 3.0}, usable)
-    assert w["code"] == "RG_OUTSIDE_GUARD" and [v["name"] for v in w["vars"]] == ["B1_D", "B2_D"]
-    assert w["vars"][0] == {"name": "B1_D", "value": 0.5, "usable": [1.0, 2.0]}
+# ---------------------------------------------------------------- V-SH-12 ③ 새(select_base step) — seed = _sel_auto_step
+def _gm():
+    from esl.doe import mesh_gmsh as mg
+    return mg
 
 
-# ---------------------------------------------------------------- V-SH-13 (④ 경로 — 순위·직행 계획)
-class FakeRoute(types.ModuleType):
-    """esl.mesh.route 스텁(계약 §4 시그니처). 실제 모듈이 있으면 시험에서 그걸 씀."""
-
-    @staticmethod
-    def choose(n_faces, step_mb, rule, *, relaxed_enabled):
-        mf, ms = rule.get("min_faces"), rule.get("min_step_mb")
-        hit = []
-        if n_faces is not None and mf is not None and n_faces >= mf:
-            hit.append("faces")
-        if step_mb is not None and ms is not None and step_mb >= ms:
-            hit.append("step_mb")
-        ok = bool(rule.get("enabled")) and relaxed_enabled and bool(hit)
-        return {"path": "cad_relaxed" if ok else "cad", "reason": "+".join(hit) if ok else None, "n_faces": n_faces,
-                "step_mb": step_mb, "min_faces": mf, "min_step_mb": ms}
-
-    @staticmethod
-    def rank_flag(q, rule):
-        if not q:
-            return None
-        fr, tp_ = q.get("fail_ratio"), q.get("tria_pct")
-        over = []
-        if fr is not None and rule.get("fail_ratio") is not None and fr > rule["fail_ratio"]:
-            over.append("fail_ratio")
-        if tp_ is not None and rule.get("tria_pct") is not None and tp_ > rule["tria_pct"]:
-            over.append("tria_pct")
-        return {"fail_ratio": fr, "tria_pct": tp_, "over": over} if over else None
+needs_gmsh = pytest.mark.skipif(not _gm().available()[0], reason="gmsh 없음")
 
 
+@needs_gmsh
+def test_step_seed_table_matches_matrix(tmp_path, core):
+    """③: BD_LOADS 점검 후보 seed = _sel_auto_step 파일(fixed_user 포함), 표 fixed_sha256 = BD_MATRIX derive 와 같아 seed 변수 전부
+    적용(unchecked 없음), ③ 결과 mesh.quality·route 기록."""
+    import synth_compare as scmp
+    import synth_doe as sd
+    import test_step_graph as tsg
+    a = sd.plate(nx=20, ny=15, Lx=tsg.LX, Lz=tsg.LZ)
+    (tmp_path / "up").mkdir()
+    step = scmp.plate_step(str(tmp_path / "up" / "b.step"), 2, Lx=tsg.LX, Lz=tsg.LZ, depth=5.0)
+    doe = tsg._study(tmp_path, step, a, shape_rules=NEW)
+    out = tmp_path / "_doe" / "S1"
+    run = tsg._runner(out, doe)
+    run("bd_input")
+    run("bd_mesh0")
+    r = run("bd_loads")
+    assert r["graph"]["ok"] and not any(str(w).startswith("RG_FAILED") for w in r["warnings"]), r["warnings"]
+    a_, kw, doc = core.last("range_guard_table")
+    auto = json.loads((out / "prep" / "select" / "auto_selection.json").read_text(encoding="utf-8"))
+    assert kw["seed"] == auto["selection"] and "fixed_user" in kw["seed"]
+    assert len(a_[3]) == 0                                   # ③ derive 고정 = _sel_fixed_ids(빈) — 이전 고정은 seed fixed_user
+    inp = json.loads((out / "prep" / "input.json").read_text(encoding="utf-8"))
+    assert isinstance(inp["mesh"].get("quality"), dict) and inp["mesh"]["route"]["path"] == "cad"
+    if not auto["selection"]["beads"]:
+        pytest.skip("seed 비드 없음")
+    doe["selection"] = {"rev": 1, "sha256": auto["sha256"], "input": auto["selection"]}
+    run("bd_matrix", rev=1, spec={"method": "lhs", "n": 3, "seed": 1, "params": [{"name": "B1_D", "lo": 3.0, "hi": 7.0}]})
+    D = core.last("derive_obj_v2")[2]
+    rows = bgr.params_rows_v2(D)
+    assert rows and all(x["guard"]["state"] != "unchecked" for x in rows if "guard" in x), [x.get("guard") for x in rows]
+
+
+# ---------------------------------------------------------------- V-SH-13 (④ 경로 — 순위·직행 계획, 실제 esl.mesh.route)
 @pytest.fixture
-def route(monkeypatch):
-    try:
-        import esl.mesh.route as real
-        return real
-    except ImportError:
-        pass
-    fake = FakeRoute("esl.mesh.route")
-    monkeypatch.setitem(sys.modules, "esl.mesh.route", fake)
-    import esl.mesh as pkg
-    monkeypatch.setattr(pkg, "route", fake, raising=False)
-    return fake
+def route():
+    return mroute
 
 
 class _C:
@@ -327,20 +356,6 @@ def test_route_of_threshold_and_legacy(tmp_path, monkeypatch, route):
     assert _route_case(tmp_path, monkeypatch, route, shape=sh, faces=9999, mb=0.01, mode="cad")["path"] == "cad_relaxed"
     assert stg._route_row({"path": "cad", "reason": None, "n_faces": 3, "min_faces": 1500, "extra": 1}) == \
         {"path": "cad", "reason": None, "n_faces": 3, "min_faces": 1500}
-
-
-def test_route_core_absent_is_legacy(tmp_path, monkeypatch):
-    """코어 esl.mesh.route 가 없으면(통합 전) 직행·순위 경고 없음 = 지금 경로 그대로(ImportError 로 작업이 죽지 않는다)."""
-    monkeypatch.setattr(stg, "_mroute", lambda: None)
-    assert _route_case(tmp_path, monkeypatch, None, shape={"schema": 1}, faces=9999, mb=0.01) is None
-    c = _C({"schema": 1})
-    monkeypatch.setattr(stg, "_shape", lambda cc: tp.resolve_shape({"schema": 1}))
-    monkeypatch.setattr(stg, "_bs", lambda cc, col: "shapes")
-    res = {"d001": {"status": "READY", "quality": {"fail_ratio": 0.9, "tria_pct": 90.0}}}
-    stg._cmp_mq_flags(c, [{"id": "d001"}], res)
-    assert "mq" not in res["d001"]
-    monkeypatch.setattr(stg, "_bs", lambda cc, col: "base")
-    assert stg._sel_mq_base(c, {"mesh": {"quality": {"fail_ratio": 0.9}}}) is None
 
 
 def test_mq_rank_flags(monkeypatch, route):

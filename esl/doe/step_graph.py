@@ -64,6 +64,7 @@ import numpy as np
 
 from esl.errors import EslError
 from esl.library import _util as U
+from esl.mesh import route as mroute
 
 XFER_JSON = "fixed_transfer.json"
 XFER_SCHEMA = "esl/doe_fixed_transfer/2"
@@ -783,8 +784,7 @@ def mesh0(c, echo) -> dict:
     if (r.get("route") or {}).get("path") == "cad_relaxed":  # v0.21.0 SH-21: 완화 직행 준비 정보(경고 아님)
         infos_s.append(text("MESH_ROUTE_RELAXED", id=ROW_ID, name=stem, n_faces=r["route"].get("n_faces"),
                             min_faces=r["route"].get("min_faces")))
-    mroute = stg._mroute()
-    if stg._bs(c, "bs_mq") == "base" and isinstance(r.get("quality"), dict) and mroute is not None:   # v0.21.0 SH-23: 기준 메시 품질 미달 = 준비 경고 1건
+    if stg._bs(c, "bs_mq") == "base" and isinstance(r.get("quality"), dict):   # v0.21.0 SH-23: 기준 메시 품질 미달 = 준비 경고 1건
         fl = mroute.rank_flag(r["quality"], stg._shape(c)["mesh_route"]["rank_quality"])
         if fl is not None:
             warns_s.append(text("MESH_QUALITY_RANK", fail_ratio=f"{float(r['quality']['fail_ratio']) * 100:.1f} %",
