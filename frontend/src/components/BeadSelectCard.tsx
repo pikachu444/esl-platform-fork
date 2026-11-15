@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { MsgFold, type FoldItem } from "./MsgFold";
 import { BEAD_SOURCE_NAME, BG_STALE_TEXT, GRAPH_FAILED_TEXT, doe, isInfoWarn, seedHasFixed, warnText } from "../api/doe";
 import { ApiError, errorText } from "../api/client";
-import type { DoeWarning, DoeFixedViol, DoeBasisMeta, DoeDeriveOut, DoeElemSet, DoeSelectionAny, DoeSelectionOut, DoeSelectViewManifest, DoeSettingsOut } from "../api/types";
+import type { DoeWarning, DoeFixedViol, DoeBasisMeta, DoeDeriveOut, DoeElemSet, DoeSelectionAny, DoeSelectionOut, DoeSelectViewManifest, DoeSettingsOut, DoeShapeRules } from "../api/types";
 import { fetchBinary } from "../view3d/fetchFiles";
 import { parseGlb, type ParsedGlb } from "../view3d/glb";
 import { DIVERGING_GRADIENT } from "../view3d/colors";
@@ -1087,7 +1087,7 @@ function StepInfoBar({ info }: { info: StepInfoView }) {
   );
 }
 
-export function BeadSelectCards({ ctrl, editable, st, fixedMissing, auto, stepInfo }: { ctrl: BeadSelectCtrl; editable: boolean; st: DoeSettingsOut | null; fixedMissing: boolean; auto?: AutoSeedView | null; stepInfo?: StepInfoView | null }) {
+export function BeadSelectCards({ ctrl, editable, st, fixedMissing, auto, stepInfo, shapeRules }: { ctrl: BeadSelectCtrl; editable: boolean; st: DoeSettingsOut | null; fixedMissing: boolean; auto?: AutoSeedView | null; stepInfo?: StepInfoView | null; shapeRules?: DoeShapeRules | null }) {
   const [tool, setTool] = useState<Tool>("click");
   const [gtool, setGtool] = useState<GraphTool>("pick");
   const [brushPx, setBrushPx] = useState(20);
@@ -1248,7 +1248,7 @@ export function BeadSelectCards({ ctrl, editable, st, fixedMissing, auto, stepIn
         <ErrorLine text={ctrl.deriveError} />
       </Card>
       <Card title="③ 비드 목록·도구">
-        <BeadList ctrl={ctrl} editable={editable} st={st} hideDirty={!!auto?.unsaved} />
+        <BeadList ctrl={ctrl} editable={editable} st={st} hideDirty={!!auto?.unsaved} shapeRules={shapeRules} />
       </Card>
     </div>
   );

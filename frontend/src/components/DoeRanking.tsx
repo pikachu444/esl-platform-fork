@@ -6,15 +6,20 @@
 // v0.16.1 경고 안(SR-D-11): 순위 그대로 + 상태 칸 ⚠ + 1위가 경고 안이면 "경고 없는 최상위" 1줄(Q1 = A).
 // v0.16.0 이름 옆 짧은 '메시 방식' 배지(세분화·재메시·메시 입력 — CAD 는 생략), 툴팁 = 충실도·시도·수렴 δ.
 import { Fragment, useState } from "react";
-import { METRIC_DEFS, RANK_WARN_NAME, STATUS_NAME, isSkipped, pctText, sortRanking, type RankSortKey } from "../api/doe";
-import type { DoeParam, DoeResultOut, EntryOut } from "../api/types";
+import { METRIC_DEFS, RANK_WARN_NAME, STATUS_NAME, isSkipped, mqTip, pctText, sortRanking, type RankSortKey } from "../api/doe";
+import type { DoeParam, DoeResultOut, DoeShapeRules, EntryOut } from "../api/types";
 import { entryKey } from "./ModeSelect";
 import { shortName, valuesText } from "./DoeThumbGrid";
 import { Empty } from "./ui";
 import { SM_CODE_TEXT, isCrossMesh, isLinResult, rankThresholds, smFallbackText, smLinRangeText } from "../api/doe";
 import { ShapeNameCell } from "./DoeInputs";
 
-export function DoeRanking({ result, params, entries, selected, onSelect, varNames, rankCfg }: {
+/** v0.21.0 메시 품질 미달 행(mq 키 또는 warn 코드 — 새 스냅샷 ④ 만) */
+const isMq = (r: { mq?: unknown; warn?: string[] | null }) => !!r.mq || !!r.warn?.includes("MESH_QUALITY_RANK");
+
+export function DoeRanking({ result, params, entries, selected, onSelect, varNames, rankCfg, shapeRules }: {
+  /** v0.21.0 스터디 스냅샷 형상 규칙(메시 품질 ⚠ 툴팁의 기준값 — 없으면 수치만) */
+  shapeRules?: DoeShapeRules | null;
   /** settings.rank — 결과 스냅샷에 임계값이 없을 때만 쓰는 대체 출처 */
   rankCfg?: { rank?: { lin_valid?: number | null; imbalance_warn?: number | null } | null } | null;
   result: DoeResultOut;
@@ -69,11 +74,25 @@ export function DoeRanking({ result, params, entries, selected, onSelect, varNam
     {(() => {
       // Q1 = A: 1위가 경고 안이면 순위는 그대로 두고 "경고 없는 최상위" 1줄
       const top = result.ranking.find((r) => r.rank === 1) ?? result.ranking[0];
-      if (!top?.warn?.length) return null;
-      const clean = result.summary?.best_clean ?? result.ranking.filter((r) => !r.warn?.length).sort((a, c) => a.rank - c.rank)[0]?.id ?? null;
+      // v0.21.0: 메시 품질 경고는 아래 별도 1줄 — 이 줄(SR-D-11)은 그 밖의 경고만 센다(옛 결과는 MQ 코드가 없어 그대로)
+      const warnOf = (r: { warn?: string[] | null }) => (r.warn ?? []).filter((w) => w !== "MESH_QUALITY_RANK");
+      if (!top || !warnOf(top).length) return null;
+      const clean = result.summary?.best_clean ?? result.ranking.filter((r) => !warnOf(r).length).sort((a, c) => a.rank - c.rank)[0]?.id ?? null;
       return (
         <div className="small warn-text" data-testid="best-clean">
-          ⚠ 1위가 경고 안입니다({top.warn.map((w) => RANK_WARN_NAME[w] ?? w).join(" · ")}) — 경고 없는 최상위: {clean ? <b className="mono">{clean}</b> : "없음"}
+          ⚠ 1위가 경고 안입니다({warnOf(top).map((w) => RANK_WARN_NAME[w] ?? w).join(" · ")}) — 경고 없는 최상위: {clean ? <b className="mono">{clean}</b> : "없음"}
+        </div>
+      );
+    })()}
+    {(() => {
+      // Q-SH-3 = A: 메시 품질 미달 형상은 순위·행 그대로 두고 ⚠ 표시 + "품질 통과 최상위" 1줄(새 스냅샷 ④ 결과만 — mq·MESH_QUALITY_RANK 가 있을 때)
+      const flagged = result.ranking.filter(isMq);
+      if (!flagged.length) return null;
+      const id = result.summary && "best_clean_mq" in result.summary ? result.summary.best_clean_mq ?? null : [...result.ranking].filter((r) => !isMq(r)).sort((a, c) => a.rank - c.rank)[0]?.id ?? null;
+      const row = id ? result.ranking.find((r) => r.id === id) : null;
+      return (
+        <div className="small warn-text" data-testid="best-clean-mq">
+          ⚠ 메시 품질 미달 형상 {flagged.length}개(순위는 그대로) — 품질 통과 최상위: {id ? <><b className="mono">{id}</b>{row?.shape?.name ? ` ${row.shape.name}` : ""}</> : "없음"}
         </div>
       );
     })()}
@@ -253,11 +272,14 @@ export function DoeRanking({ result, params, entries, selected, onSelect, varNam
                 ))}
                 <td>
                   <span className="badge ok">OK</span>
-                  {!!r.warn?.length && (
-                    <span className="badge warn" title={r.warn.map((w) => RANK_WARN_NAME[w] ?? w).join(" · ")} data-testid={`rank-warn-${r.id}`}>
-                      ⚠
-                    </span>
-                  )}
+                  {(() => {
+                    const wl: string[] = isMq(r) && !r.warn?.includes("MESH_QUALITY_RANK") ? [...(r.warn ?? []), "MESH_QUALITY_RANK"] : r.warn ?? [];
+                    return wl.length ? (
+                      <span className="badge warn" title={wl.map((w) => (w === "MESH_QUALITY_RANK" && r.mq ? mqTip(r.mq, shapeRules) : RANK_WARN_NAME[w] ?? w)).join(" · ")} data-testid={`rank-warn-${r.id}`}>
+                        ⚠
+                      </span>
+                    ) : null;
+                  })()}
                   {r.warnings_n > 0 && (
                     <span className="badge warn" title="안 경고(반력 잔차 등) — 보고서에 상세">
                       ⚠ {r.warnings_n}

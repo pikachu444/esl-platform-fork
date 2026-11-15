@@ -2375,7 +2375,63 @@ export interface DoeRankCfg {
   /** R-SM-1 결정: 1차 범위 밖이라 재풀이 C 로 대체한 안 수(lin 결과만) */
   n_fallback?: number | null;
 }
+/** v0.21.0 GET /doe/settings shape_rules(esl_bead_shape_v021.md §6 — 표시용 일부. 옛 서버면 없음) */
+export interface DoeShapeRulesCfg {
+  enabled: boolean;
+  w_partial: boolean;
+  range_guard: { enabled: boolean };
+  mesh_route: { relaxed_direct: { enabled: boolean; min_faces: number | null } };
+}
+/** v0.21.0 스터디 스냅샷 shape_rules(§7 — DoeStudyOut.inputs.shape_rules. 옛 스터디 = 키 없음/null = v0.20.0 화면 그대로) */
+export interface DoeShapeRules {
+  schema: number;
+  w_partial: boolean;
+  /** null = guard 꺼짐 */
+  range_guard: {
+    jac_min?: number;
+    tria_angle_min_deg?: number;
+    area_ratio_min?: number;
+    max_new_fail_ratio?: number | null;
+    flip_deg?: number;
+    steps?: number;
+    min_keep_frac?: number;
+    combo?: { enabled?: boolean; full_max_vars?: number; samples?: number; max_group?: number };
+    budget?: { prep_timeout_s?: number; matrix_timeout_s?: number; max_evals?: number; max_vars?: number };
+  } | null;
+  mesh_route: {
+    relaxed_direct: { enabled: boolean; min_faces: number | null; min_step_mb: number | null };
+    rank_quality: { fail_ratio: number; tria_pct: number };
+  };
+}
+/** v0.21.0 변수 행 guard(§4.4 — 새 스냅샷의 그래프 변수만) */
+export type DoeGuardState = "ok" | "limited" | "blocked" | "unchecked";
+export interface DoeGuard {
+  state: DoeGuardState;
+  from: XY;
+  usable: XY | null;
+  /** 첫 위반 기준(inverted·jac·tri_angle·area_ratio·new_fail) */
+  reason: string | null;
+  value: number | null;
+  combo_scale: number | null;
+}
+/** v0.21.0 ④ 형상 행·③ 기준 메시의 메싱 경로(§5.3) */
+export interface DoeShapeRoute {
+  path: "cad" | "cad_relaxed";
+  reason: ("faces" | "step_mb")[];
+  n_faces: number | null;
+  step_mb?: number | null;
+  min_faces: number | null;
+  min_step_mb?: number | null;
+}
+/** v0.21.0 순위 행 메시 품질(§5.4 — 걸린 형상만) */
+export interface DoeRankMq {
+  fail_ratio: number;
+  tria_pct: number;
+  over?: ("fail" | "tria")[] | null;
+}
 export interface DoeSettingsOut {
+  /** v0.21.0 형상 규칙 설정(표시용, 옛 서버면 없음) */
+  shape_rules?: DoeShapeRulesCfg | null;
   /** v0.20.0 순위 지표 설정(옛 서버면 없음) */
   rank?: DoeRankCfg | null;
   /** v0.20.0 하중 전달 설정 — 모든 모드 공통 최상위 칸(esl_load_transfer.md §13.6, 옛 서버면 없음 = select 숨김) */
@@ -2702,6 +2758,9 @@ export interface DoePrepShape {
   /** v0.16.1 작은 형상 억제 요약(defeature 형상만, §5A.5)·메시 입력 진단(SR-D-24) */
   defeature?: DoeShapeDefeature | null;
   diag?: DoeShapeDiag | null;
+  /** v0.21.0 메싱 경로(cad | cad_relaxed)·선택 근거(새 스냅샷만) */
+  mesh_path?: "cad" | "cad_relaxed" | null;
+  route?: DoeShapeRoute | null;
 }
 export interface DoeProps {
   t: number;
@@ -2774,7 +2833,9 @@ export type DoeCellWarning =
   | { code: "SELECT_FIXED_MOVED"; n: number; max_mm: number }
   | { code: "SELECT_QUALITY_WARN"; new_fail: number; new_fail_ratio: number; area_ratio_min?: number; rot_max_deg?: number }
   /** v0.16.1 SR-D-38 다른 선택 비드 침범(warn 정책) */
-  | { code: "SELECT_CROSS_BEAD_MOVE"; n: number; max_mm: number; beads?: string[][] };
+  | { code: "SELECT_CROSS_BEAD_MOVE"; n: number; max_mm: number; beads?: string[][] }
+  /** v0.21.0 이 안은 점검된 안전 범위 밖 값(경고만, §4.3) */
+  | { code: "RG_OUTSIDE_GUARD"; vars: { name: string; value: number; usable: XY }[] };
 export interface DoeFixedViol {
   n: number;
   max_mm: number;
@@ -2828,6 +2889,8 @@ export interface DoeStudyOut {
     select_base?: DoeSelectBase | null;
     /** v0.17.0 선택 schema(BG-D-35): 2 = 그래프 스터디(v0.17.0 이후 만든 select), 키 없음 = 1 */
     select_schema?: 1 | 2 | null;
+    /** v0.21.0 형상 규칙 스냅샷(esl_bead_shape_v021.md §2.1 — 옛 스터디 = 키 없음/null) */
+    shape_rules?: DoeShapeRules | null;
   };
   phase: DoePhase;
   version: number;
@@ -2906,6 +2969,11 @@ export interface DoeParam {
   default_range: XY;
   use_default: boolean;
   group_members: string[];
+  /** v0.21.0 품질 점검 결과(새 스냅샷의 그래프 변수만) */
+  guard?: DoeGuard | null;
+  /** v0.21.0 W 행: 폭 정보가 있는 구간 앵커·길이 비율(부분일 때만) */
+  w_segs?: number[] | null;
+  w_cover?: number | null;
 }
 export interface DoeParamsOut {
   beads: DoeBead[];
@@ -3000,11 +3068,13 @@ export interface DoeRankRow {
   sm_warn?: string[] | null;
   /** v0.20.0 ESL별 재풀이 C(entry_id → C) — 새 스냅샷만 */
   C_solve?: Record<string, number> | null;
+  /** v0.21.0 ④ 메시 품질 미달 형상(걸린 형상만 — 새 스냅샷) */
+  mq?: DoeRankMq | null;
 }
 /** v0.20.0 순위 지표: lin = 1차 섭동(새 기본), solve = 재풀이 C(옛) */
 export type DoeRankMetric = "lin" | "solve";
 /** v0.16.2 AD-D-8: MORPH_EXTREME_ELEMENTS(극단 요소)도 순위 ⚠ */
-export type DoeRankWarn = "FIXED_MOVED" | "QUALITY_WARN" | "CROSS_BEAD_MOVE" | "MORPH_EXTREME_ELEMENTS";
+export type DoeRankWarn = "FIXED_MOVED" | "QUALITY_WARN" | "CROSS_BEAD_MOVE" | "MORPH_EXTREME_ELEMENTS" | "MESH_QUALITY_RANK";
 /** 안 1개 · ESL 1개의 컴플라이언스·베이스라인 대비 비율 */
 export interface DoePerEsl {
   entry_id: string;
@@ -3082,7 +3152,13 @@ export interface DoeResultOut {
   /** 서버 정렬 키(기본 score) */
   sort?: string;
   /** v0.16.1 결과 요약 — best_clean = 경고 없는 최상위 안 id(없으면 null, Q1 = A) */
-  summary?: { best_clean?: string | null } | null;
+  summary?: {
+    best_clean?: string | null;
+    /** v0.21.0 ④: 메시 품질 경고 없는 최상위 형상 id(최상위가 깨끗하면 그 id, 없으면 null) */
+    best_clean_mq?: string | null;
+    /** v0.21.0 ③: 기준 메시 품질(모든 안이 같은 메시) */
+    mesh_quality?: { fail_ratio: number; tria_pct: number; warn: boolean } | null;
+  } | null;
   /** v0.20.0 순위 지표(esl_stiffness_metric.md §6 — 옛 결과 = 키 없음 = solve 표시 그대로). lin = 재풀이 없는 1차 섭동 지표 */
   metric?: DoeRankMetric | null;
   lin_form?: "taylor" | "ritz" | null;
@@ -3522,6 +3598,9 @@ export interface DoeBeadDerived {
   inner_loops_n?: number | null;
   hold_fixed?: 0 | 1 | null;
   hold?: { n_ring_nodes: number; n_blend_nodes: number; n_fixed: number } | null;
+  /** v0.21.0 그래프 비드 W 가 일부 구간에만(부분일 때만): 폭 정보 있는 세그먼트 앵커·길이 비율 0..1 */
+  w_segs?: number[] | null;
+  w_cover?: number | null;
 }
 /** v0.16.1 섬 1개(§4.2) */
 export interface DoeIslandDerived {
@@ -3545,6 +3624,9 @@ export interface DoePrepMesh {
   tri_frac?: number | null;
   /** ④ 단계별 결과·초(C2-D-30 형식) */
   stage_times?: { stage: string; outcome: "READY" | "FAILED_MESH" | "SKIPPED"; seconds: number; tries?: number; reason?: string; code?: string; timed_out?: boolean }[] | null;
+  /** v0.21.0 ③ 기준 메시 경로·품질(새 스냅샷만, §5.3) */
+  route?: DoeShapeRoute | null;
+  quality?: { fail_ratio: number; tria_pct: number; fail_elems: number; n_elems: number } | null;
 }
 /** v0.18.0 prep.fixed.xfer(SG-D-13~15 요약) */
 export interface DoePrepFixedXfer {
@@ -3588,7 +3670,7 @@ export interface DoeDerivedGraph {
   edits_applied: { toggle: number; merge: number; split: number };
   segments: { id: number; anchor: number; type: BgSegType; side: BgSide | null; tier: number; D: number; entry_width: number | null; length: number | null; network: number }[];
   junction_zones: { id: number; anchor: number; reason: BgZoneReason }[];
-  beads: { id: string; src: "graph" | "elems"; segs: number[]; vars: ("D" | "W")[]; D_nom: number | null; W_nom: number | null; tier: number | null }[];
+  beads: { id: string; src: "graph" | "elems"; segs: number[]; vars: ("D" | "W")[]; D_nom: number | null; W_nom: number | null; tier: number | null; w_segs?: number[] | null; w_cover?: number | null }[];
   /** 대칭 묶기 제안(BG-D-21) — 세그먼트 앵커 쌍 */
   sym_pairs: [number, number][];
 }

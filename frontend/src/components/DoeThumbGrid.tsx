@@ -50,7 +50,7 @@ function Thumb({ id, url, cell, params, select, onOpen }: { id: string; url: str
   const skipped = cell ? isSkipped(cell.status) || (!!select && isFailed(cell.status)) : false;
   const warns = !skipped ? cell?.warnings ?? [] : [];
   const moved = warns.find((w) => w.code === "SELECT_FIXED_MOVED");
-  const warnTip = warns.map((w) => (w.code === "SELECT_FIXED_MOVED" ? `체결 위치 어긋남: ${cellWarnText(w)}` : `품질 경고: ${cellWarnText(w)}`)).join("\n");
+  const warnTip = warns.map((w) => (w.code === "SELECT_FIXED_MOVED" ? `체결 위치 어긋남: ${cellWarnText(w)}` : w.code === "RG_OUTSIDE_GUARD" ? `점검된 안전 범위 밖: ${cellWarnText(w)}` : `품질 경고: ${cellWarnText(w)}`)).join("\n");
   const tip = cell ? `${id} · ${valuesText(params, cell.values)}${cell.code ? ` · ${cell.code}` : ""}${warnTip ? `\n${warnTip}` : ""}` : `${id} 공칭`;
   const open = onOpen ? () => onOpen(id) : undefined;
   return (

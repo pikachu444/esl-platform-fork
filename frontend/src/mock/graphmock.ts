@@ -4,7 +4,7 @@
 // (코너·짧은 띠·spur → 접합 구역(D7), 고리 변 side, 앵커 = 격자 요소 최소 index). 결정적(난수 없음).
 import type {
   BeadGraph, BgSegment, DoeBasisMeta, DoeBead, DoeBeadDerived, DoeBeadSelGraph, DoeDeriveOut, DoeDerivedGraph, DoeParam, DoeParamsOut, DoePlanOut, DoeSelectAutoOut, DoeSelectGraphOut,
-  DoeSelectViewManifest, DoeSelectionV2, DoeWarning, XY,
+  DoeGuard, DoeSelectViewManifest, DoeSelectionV2, DoeShapeRules, DoeWarning, XY,
 } from "../api/types";
 import { writeBasis } from "../view3d/select/basis";
 import { writeGraphBin, type GraphLabels } from "../view3d/select/graph";
@@ -105,9 +105,19 @@ export function graphManifest(): DoeSelectViewManifest {
   return { schema: "esl/bead_select_view/1", n_nodes: m.n, n_elems: m.elemId.length, n_tris: m.tri2elem.length, mesh_sha256: "4e6".padEnd(64, "0"), h_med: fx.grid.h, plate_normal: [0, 0, 1], fixed: { scan_n: m.fixed.reduce((s, v) => s + v, 0), source: "scan" }, glb: { name: "part.glb", bytes: m.glb.byteLength }, bin: m.binInfo };
 }
 
-export function graphOut(): DoeSelectGraphOut {
+/** v0.21.0 시연: 새 스냅샷(shape_rules) 스터디의 분류 결과는 일부 세그먼트가 입구 선 한쪽뿐이라 entry_width 가 없다(= W 부분 비드가 생김) */
+export const NO_W_ANCHORS: ReadonlySet<number> = new Set([1479, 140]);
+let SHAPE_GRAPH: BeadGraph | null = null;
+export function graphFor(shape: boolean): BeadGraph {
   const m = graphMesh();
-  return { graph: m.graph, sha256: m.sha256, edits_applied: null, warnings: m.graph.warnings ?? [], beadgraph_version: "1.0.0", rules: 1, morph_rules: 1 };
+  if (!shape) return m.graph;
+  SHAPE_GRAPH ??= { ...m.graph, segments: m.graph.segments.map((s) => (NO_W_ANCHORS.has(s.anchor) ? { ...s, entry_width: null } : s)) };
+  return SHAPE_GRAPH;
+}
+
+export function graphOut(shape = false): DoeSelectGraphOut {
+  const m = graphMesh();
+  return { graph: graphFor(shape), sha256: m.sha256, edits_applied: null, warnings: m.graph.warnings ?? [], beadgraph_version: "1.0.0", rules: 1, morph_rules: 1 };
 }
 
 // ---------------------------------------------------------------- 자동 seed(BG-D-20)
@@ -152,12 +162,15 @@ interface Resolved {
   W: number | null;
   tier: number;
   vars: ("D" | "W")[];
+  /** v0.21.0 W 가 일부 구간에만(부분일 때만): 폭 정보 있는 세그먼트 앵커·길이 비율 */
+  wSegs: number[] | null;
+  wCover: number | null;
 }
 
-/** 422·409 또는 해석 결과 */
-function resolve(sel: DoeSelectionV2): { bad: MockResponse } | { beads: Resolved[]; segsOut: DoeDerivedGraph["segments"] } {
+/** 422·409 또는 해석 결과. shape = 스터디 스냅샷 형상 규칙(없으면 v0.20.0 규칙 — W 는 모든 세그먼트가 가질 때만) */
+function resolve(sel: DoeSelectionV2, shape?: DoeShapeRules | null): { bad: MockResponse } | { beads: Resolved[]; segsOut: DoeDerivedGraph["segments"] } {
   const m = graphMesh();
-  const g = m.graph;
+  const g = graphFor(!!shape);
   if (sel.graph && sel.graph.sha256 !== m.sha256) return { bad: err(409, "BG_GRAPH_STALE", "분류 결과가 바뀌었습니다 — 다시 확인 후 저장", { saved: sel.graph.sha256, current: m.sha256 }) };
   const ed = sel.graph?.edits ?? { toggle: [], merge: [], split: [] };
   const segOf = (a: number): BgSegment | null => g.segments.find((s) => s.anchor === a) ?? (a >= 0 && a < m.labels.segment.length && m.labels.segment[a] >= 0 ? g.segments.find((s) => s.id === m.labels.segment[a]) ?? null : null);
@@ -208,10 +221,14 @@ function resolve(sel: DoeSelectionV2): { bad: MockResponse } | { beads: Resolved
     const len = (s: BgSegment) => s.length ?? 1;
     const L = ss.reduce((a, s) => a + len(s), 0) || 1;
     const D = ss.reduce((a, s) => a + s.D * len(s), 0) / L;
-    const hasW = ss.length > 0 && ss.every((s) => s.entry_width != null && !["plateau", "area"].includes(s.type));
-    const W = hasW ? ss.reduce((a, s) => a + (s.entry_width ?? 0) * len(s), 0) / L : null;
+    const isW = (s: BgSegment) => s.entry_width != null && !["plateau", "area"].includes(s.type);
+    const wss = shape?.w_partial ? ss.filter(isW) : ss;
+    const hasW = shape?.w_partial ? wss.length > 0 : ss.length > 0 && ss.every(isW);
+    const Lw = wss.reduce((a, s) => a + len(s), 0) || 1;
+    const W = hasW ? wss.reduce((a, s) => a + (s.entry_width ?? 0) * len(s), 0) / Lw : null;
+    const wSegs = shape?.w_partial && hasW && wss.length < ss.length ? wss.map((s) => s.anchor).sort((x, y) => x - y) : null;
     const vars = (b.vars ?? ["D", "W"]).filter((v) => v === "D" || hasW) as ("D" | "W")[];
-    beads.push({ id: b.id, name: b.name ?? b.id.toUpperCase(), segs: ss, D: +D.toFixed(3), W: W != null ? +W.toFixed(3) : null, tier: ss[0]?.tier ?? 0, vars });
+    beads.push({ id: b.id, name: b.name ?? b.id.toUpperCase(), segs: ss, D: +D.toFixed(3), W: W != null ? +W.toFixed(3) : null, tier: ss[0]?.tier ?? 0, vars, wSegs, wCover: wSegs ? +(Lw / L).toFixed(4) : null });
   }
   for (const t of sel.ties ?? []) {
     const bs = t.map((id) => beads.find((x) => x.id === id));
@@ -226,10 +243,40 @@ function resolve(sel: DoeSelectionV2): { bad: MockResponse } | { beads: Resolved
 
 const range = (v: number, rel: number): XY => [+(v * (1 - rel)).toFixed(2), +(v * (1 + rel)).toFixed(2)];
 
-export function graphDerive(sel: DoeSelectionV2): MockResponse {
+/** v0.21.0 품질 점검(guard) 목 — 변수 이름의 비드 번호로 결정적(derive·params 가 같은 값): n%6 == 1 → D 상한 축소(jac) · 2 → W 하한 축소(뒤집힘)+조합 · 5(n>5) → W 막힘 · 4 → 둘 다 미점검 · 그 밖 ok.
+ *  limited·blocked 는 default_range = usable, feasible 의 위반 쪽 = min/max(feasible, usable)(§4.4). guard 가 꺼진 스냅샷(range_guard null)·옛 스냅샷은 호출하지 않음 */
+export function mockGuard(name: string, type: "D" | "W", nominal: number, def: XY, feasible: XY): { guard: DoeGuard; def: XY; feasible: XY; use_default: boolean } {
+  const n = Number(name.slice(1).split("_")[0]) || 0;
+  const k = n % 6;
+  const keep = { def, feasible, use_default: true };
+  const ok: DoeGuard = { state: "ok", from: def, usable: def, reason: null, value: null, combo_scale: null };
+  const cut = (side: "lo" | "hi", f: number) => {
+    const usable: XY = side === "hi" ? [def[0], +(nominal + (def[1] - nominal) * f).toFixed(4)] : [+(nominal - (nominal - def[0]) * f).toFixed(4), def[1]];
+    return { usable, feasible: (side === "hi" ? [feasible[0], Math.min(feasible[1], usable[1])] : [Math.max(feasible[0], usable[0]), feasible[1]]) as XY };
+  };
+  if (k === 1 && type === "D") {
+    const c = cut("hi", 0.6);
+    return { guard: { ...ok, state: "limited", usable: c.usable, reason: "jac", value: 0.214 }, def: c.usable, feasible: c.feasible, use_default: true };
+  }
+  if (k === 2) {
+    const sc = 0.69;
+    if (type === "D") return { guard: { ...ok, combo_scale: sc }, def: [+(nominal + (def[0] - nominal) * sc).toFixed(4), +(nominal + (def[1] - nominal) * sc).toFixed(4)] as XY, feasible, use_default: true };
+    const c = cut("lo", 0.5);
+    const u: XY = [+(nominal + (c.usable[0] - nominal) * sc).toFixed(4), +(nominal + (c.usable[1] - nominal) * sc).toFixed(4)];
+    return { guard: { ...ok, state: "limited", usable: u, reason: "inverted", value: null, combo_scale: sc }, def: u, feasible: c.feasible, use_default: true };
+  }
+  if (k === 5 && n > 5 && type === "W") {
+    const u: XY = [+(nominal - 0.4).toFixed(4), +(nominal + 0.3).toFixed(4)];
+    return { guard: { ...ok, state: "blocked", usable: u, reason: "tri_angle", value: 7.8 }, def: u, feasible: [Math.max(feasible[0], u[0]), Math.min(feasible[1], u[1])] as XY, use_default: false };
+  }
+  if (k === 4) return { guard: { ...ok, state: "unchecked", usable: null }, ...keep };
+  return { guard: ok, ...keep };
+}
+
+export function graphDerive(sel: DoeSelectionV2, shape?: DoeShapeRules | null): MockResponse {
   const m = graphMesh();
-  const g = m.graph;
-  const r = resolve(sel);
+  const g = graphFor(!!shape);
+  const r = resolve(sel, shape);
   if ("bad" in r) return r.bad;
   const warnings: DoeWarning[] = [];
   const beads: DoeBeadDerived[] = r.beads.map((b) => {
@@ -238,12 +285,28 @@ export function graphDerive(sel: DoeSelectionV2): MockResponse {
     if (b.segs.some((s) => s.type === "pocket" && (s.entry_width ?? 0) > 70)) w.push({ code: "BG_CORNER_GUARD", level: "info", bead: b.id, n_nodes: 12, flank_max_deg: 58 });
     const ds = b.segs.map((s) => s.D);
     if (Math.max(...ds) - Math.min(...ds) > 0.5) w.push({ code: "BG_GROUP_NOMINAL_SPREAD", bead: b.id, min: Math.min(...ds), max: Math.max(...ds) });
+    // v0.21.0 새 스냅샷: BG_W_PARTIAL(정보) · guard 정보·경고(RG_RANGE_LIMITED·RG_VAR_BLOCKED·RG_UNCHECKED)
+    if (b.wSegs) w.push({ code: "BG_W_PARTIAL", level: "info", bead: b.id, n_w: b.wSegs.length, n_seg: b.segs.length, cover: b.wCover, no_w: b.segs.map((s) => s.anchor).filter((a) => !b.wSegs!.includes(a)) });
+    if (shape?.range_guard) {
+      for (const t of b.vars) {
+        const nom = t === "D" ? b.D : b.W ?? 0;
+        const def = range(nom, t === "D" ? 0.3 : 0.2);
+        const mg = mockGuard(`${b.id.toUpperCase()}_${t}`, t, nom, def, def);
+        const nm = `${b.id.toUpperCase()}_${t}`;
+        if (mg.guard.state === "limited" && mg.guard.usable) {
+          const hi = mg.guard.usable[1] < def[1];
+          w.push({ code: "RG_RANGE_LIMITED", level: "info", bead: b.id, var: nm, from: def, to: mg.guard.usable, side: hi ? "hi" : "lo", reason: mg.guard.reason, value: mg.guard.value });
+        } else if (mg.guard.state === "blocked") w.push({ code: "RG_VAR_BLOCKED", bead: b.id, var: nm, usable: mg.guard.usable, reason: mg.guard.reason });
+        else if (mg.guard.state === "unchecked") w.push({ code: "RG_UNCHECKED", level: "info", var: nm });
+      }
+    }
     const nEl = b.segs.reduce((a, s) => a + s.n_elems, 0);
     return {
       id: b.id, name: b.name, n_elems: nEl, n_nodes: nEl, tiers: [{ k: 1, n_elems: nEl, D_nom: b.D, normal: [0, 0, 1], planarity_mm: 0 }],
       slope: { n_elems: 0, elems: EMPTY_SET(), suggested_n: 0, edited: false }, boundary: { loops: [], n_nodes: 0 },
       W_nom: b.W, W_min: b.W, W_max: b.W, sense: b.segs[0]?.rel_depth < 0 ? "concave" : "convex", blend_mm: b.W ? 12 : 0, blend_clipped: false, fixed_in_bead_n: 0, fixed_in_blend_n: 0,
       range_default: { D: { "1": range(b.D, 0.3) }, W: b.W != null ? range(b.W, 0.2) : null }, warnings: w, hold_fixed: 1,
+      ...(b.wSegs ? { w_segs: b.wSegs, w_cover: b.wCover } : {}),
     };
   });
   const sym = (fx.sym_pairs as number[][]).map((p) => [p[0], p[1]] as [number, number]);
@@ -253,7 +316,7 @@ export function graphDerive(sel: DoeSelectionV2): MockResponse {
     edits_applied: { toggle: sel.graph?.edits.toggle.length ?? 0, merge: sel.graph?.edits.merge.length ?? 0, split: sel.graph?.edits.split.length ?? 0 },
     segments: r.segsOut,
     junction_zones: g.junction_zones.map((z) => ({ id: z.id, anchor: z.anchor, reason: z.reason })),
-    beads: r.beads.map((b) => ({ id: b.id, src: "graph", segs: b.segs.map((s) => s.anchor), vars: b.vars, D_nom: b.D, W_nom: b.W, tier: b.tier })),
+    beads: r.beads.map((b) => ({ id: b.id, src: "graph", segs: b.segs.map((s) => s.anchor), vars: b.vars, D_nom: b.D, W_nom: b.W, tier: b.tier, ...(b.wSegs ? { w_segs: b.wSegs, w_cover: b.wCover } : {}) })),
     sym_pairs: sym,
   };
   const out: DoeDeriveOut = { sha256: graphSelSha(sel), beads, fixed: { scan_n: m.fixed.reduce((s, v) => s + v, 0), user_n: 0, source: "scan" }, warnings, graph_algo: 1, graph };
@@ -261,8 +324,8 @@ export function graphDerive(sel: DoeSelectionV2): MockResponse {
 }
 
 /** 변수(BG-D-22): B<n>_D · B<n>_W(k 없음). 대칭 묶기 = 작은 id 변수 1개 + group_members */
-export function graphParams(sel: DoeSelectionV2): DoeParamsOut {
-  const r = resolve(sel);
+export function graphParams(sel: DoeSelectionV2, shape?: DoeShapeRules | null): DoeParamsOut {
+  const r = resolve(sel, shape);
   if ("bad" in r) return { beads: [], params: [], warnings: [] };
   const tieOf = (id: string) => (sel.ties ?? []).find((t) => t.includes(id)) ?? null;
   const beads: DoeBead[] = [];
@@ -275,10 +338,16 @@ export function graphParams(sel: DoeSelectionV2): DoeParamsOut {
     const up = b.id.toUpperCase();
     const others = (k: "D" | "W") => (t ? t.filter((x) => x !== b.id).map((x) => `${x.toUpperCase()}_${k}`) : []);
     const Wf = b.W != null ? Math.max(10, 6) : 6;
+    /** v0.21.0 guard(range_guard 가 켜진 새 스냅샷만) — 변수 행에 guard 를 얹고 기본 범위·feasible 을 점검 결과로 */
+    const guarded = (p: DoeParam): DoeParam => {
+      if (!shape?.range_guard) return p;
+      const mg = mockGuard(p.name, p.type as "D" | "W", p.nominal, p.default_range, p.feasible);
+      return { ...p, guard: mg.guard, default_range: mg.def, feasible: mg.feasible, use_default: mg.use_default };
+    };
     if (b.vars.includes("D"))
-      params.push({ name: `${up}_D`, type: "D", bead: b.id, tier: b.tier, nominal: b.D, feasible: [0.5, +Math.min(b.D * 2, b.W != null ? (b.W - Wf) / 2 : b.D * 2).toFixed(2)], feasible_source: "estimate", default_range: range(b.D, 0.3), use_default: true, group_members: others("D") });
+      params.push(guarded({ name: `${up}_D`, type: "D", bead: b.id, tier: b.tier, nominal: b.D, feasible: [0.5, +Math.min(b.D * 2, b.W != null ? (b.W - Wf) / 2 : b.D * 2).toFixed(2)], feasible_source: "estimate", default_range: range(b.D, 0.3), use_default: true, group_members: others("D") }));
     if (b.vars.includes("W") && b.W != null)
-      params.push({ name: `${up}_W`, type: "W", bead: b.id, nominal: b.W, feasible: [+(2 * b.D + Wf).toFixed(2), +(b.W * 1.5).toFixed(2)], feasible_source: "estimate", default_range: range(b.W, 0.2), use_default: true, group_members: others("W") });
+      params.push(guarded({ name: `${up}_W`, type: "W", bead: b.id, nominal: b.W, feasible: [+(2 * b.D + Wf).toFixed(2), +(b.W * 1.5).toFixed(2)], feasible_source: "estimate", default_range: range(b.W, 0.2), use_default: true, group_members: others("W"), ...(b.wSegs ? { w_segs: b.wSegs, w_cover: b.wCover } : {}) }));
   });
   return { beads, params, warnings: [] };
 }
@@ -316,10 +385,10 @@ export function graphPlan(sel: DoeSelectionV2): DoePlanOut {
 }
 
 /** 기저(목): D = 그 세그먼트 바닥 노드를 부모에서 멀어지는 쪽 n0 로 1(자손 생략), W = 없음(0 변위) */
-export function graphBasis(sel: DoeSelectionV2): { meta: DoeBasisMeta; bin: ArrayBuffer; params: DoeParam[] } {
+export function graphBasis(sel: DoeSelectionV2, shape?: DoeShapeRules | null): { meta: DoeBasisMeta; bin: ArrayBuffer; params: DoeParam[] } {
   const m = graphMesh();
-  const r = resolve(sel);
-  const ps = graphParams(sel);
+  const r = resolve(sel, shape);
+  const ps = graphParams(sel, shape);
   const vars: { idx: number[]; vec: number[] }[] = [];
   const meta: DoeBasisMeta = { schema: "esl/bead_select_basis/1", sha256: "", selection_sha256: graphSelSha(sel), n_nodes: m.n, vars: [] };
   for (const p of ps.params) {
@@ -349,13 +418,13 @@ export function graphBasis(sel: DoeSelectionV2): { meta: DoeBasisMeta; bin: Arra
 }
 
 /** schema 2 저장 검사(요소 비드 + GRAPH_FAILED 스터디 포함 — 목은 그래프 비드만 해석) */
-export function graphValidate(sel: DoeSelectionV2 | undefined, graphAvailable: boolean): MockResponse | null {
+export function graphValidate(sel: DoeSelectionV2 | undefined, graphAvailable: boolean, shape?: DoeShapeRules | null): MockResponse | null {
   if (!sel || sel.schema_version !== 2) return err(422, "SELECT_SCHEMA_MISMATCH", "이 스터디는 선택 schema 2 입니다.");
   if (!Array.isArray(sel.beads) || !sel.beads.length) return err(422, "SELECT_EMPTY_TIER", "비드가 없습니다.");
   if (!graphAvailable && sel.beads.some((b) => b.src === "graph")) return err(422, "BG_SEG_UNKNOWN", "분류 결과가 없어 그래프 비드를 쓸 수 없습니다.", { anchor: -1 });
   for (const b of sel.beads) if (b.src === "graph" && !b.segs.length) return err(422, "BG_GROUP_NOT_CONNECTED", "세그먼트 없는 비드가 있습니다.", { bead: b.id });
   if (!graphAvailable) return null;
-  const r = resolve(sel);
+  const r = resolve(sel, shape);
   return "bad" in r ? r.bad : null;
 }
 

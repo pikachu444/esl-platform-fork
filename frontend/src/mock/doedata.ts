@@ -4,7 +4,7 @@
 import type {
   DoeDefeatureFeature, DoeDefeatureList, DoeRankWarn,
   CompareShapeIn, DoeBead, DoeCheckOut, DoeCheckShape, DoeDesignStatus, DoeExcluded, DoeFileOut, DoeMatrixOut, DoeMethodSources, DoeParam, DoeParamsOut, DoePlanLink, DoePlanOut,
-  DoeLoadTransferDiag, DoeLoadTransferMethod, DoeRankMetric, DoeLoadTransferResolved, DoeLoadTransferSummary, DoeMeshMethod, DoeMeshMode, DoeMeshPart, DoePrepShape, DoePreviewCell, DoeRankRow, DoeResultOut, DoeScenario, DoeSettingsOut, DoeShapeQuality, DoeShapeRef, DoeSpec, DoeStudyOut, DoeWarning, EntryOut, JobOut, JobType, Me, MeshCheckOut, XY,
+  DoeLoadTransferDiag, DoeLoadTransferMethod, DoeRankMetric, DoeLoadTransferResolved, DoeLoadTransferSummary, DoeMeshMethod, DoeMeshMode, DoeMeshPart, DoePrepShape, DoePreviewCell, DoeRankRow, DoeResultOut, DoeScenario, DoeSettingsOut, DoeShapeQuality, DoeShapeRef, DoeShapeRules, DoeSpec, DoeStudyOut, DoeWarning, EntryOut, JobOut, JobType, Me, MeshCheckOut, XY,
 } from "../api/types";
 import EXAMPLE_YAML from "../../../config/esl_platform.example.yaml?raw";
 import { mockView3d } from "./view3dmock";
@@ -75,10 +75,24 @@ function exampleYaml(section: string, key: string): unknown {
   return undefined;
 }
 
+/** v0.21.0 새 스터디 스냅샷 shape_rules 목 값(계약 §6 기본값 — 화면은 스냅샷에서만 읽음) */
+export const MOCK_SHAPE_RULES: DoeShapeRules = {
+  schema: 1,
+  w_partial: true,
+  range_guard: {
+    jac_min: 0.3, tria_angle_min_deg: 10, area_ratio_min: 0.2, max_new_fail_ratio: null, flip_deg: 60, steps: 5, min_keep_frac: 0.25,
+    combo: { enabled: true, full_max_vars: 4, samples: 16, max_group: 8 },
+    budget: { prep_timeout_s: 180, matrix_timeout_s: 60, max_evals: 4000, max_vars: 120 },
+  },
+  mesh_route: { relaxed_direct: { enabled: true, min_faces: 1500, min_step_mb: null }, rank_quality: { fail_ratio: 0.1, tria_pct: 15 } },
+};
+
 export function makeDoeSettings(): DoeSettingsOut {
   return {
     // v0.20.0 하중 전달(esl_load_transfer.md §13.6) — 모든 모드 공통 최상위 칸, 새 스터디 기본 work
     load_transfer: { method: exampleYaml("load_transfer", "method") as DoeLoadTransferMethod, cell_size_mm: exampleYaml("load_transfer", "cell_size_mm") as number | null, cell_choices_mm: exampleYaml("load_transfer", "cell_choices_mm") as (number | null)[], cell_min_mm: exampleYaml("load_transfer", "cell_min_mm") as number },
+    // v0.21.0 형상 규칙(esl_bead_shape_v021.md §6 — 표시용 일부)
+    shape_rules: { enabled: true, w_partial: true, range_guard: { enabled: true }, mesh_route: { relaxed_direct: { enabled: true, min_faces: MOCK_SHAPE_RULES.mesh_route.relaxed_direct.min_faces } } },
     rank: { metric: exampleYaml("rank", "metric") as DoeRankMetric, lin_form: exampleYaml("rank", "lin_form") as "ritz" | "taylor", lin_valid: exampleYaml("rank", "lin_valid") as number, imbalance_warn: exampleYaml("rank", "imbalance_warn") as number },
     enabled: true,
     reason: null,
@@ -372,7 +386,7 @@ export function makeResult(spec: DoeSpec, cells: DoePreviewCell[], entryIds: str
       excluded.push({ id: c.id, status: "FAILED_MORPH", code: "GEOM_QUALITY", values: c.values });
       continue;
     }
-    const warn = (c.warnings ?? []).map((w) => (w.code === "SELECT_FIXED_MOVED" ? "FIXED_MOVED" : "QUALITY_WARN") as DoeRankWarn);
+    const warn = (c.warnings ?? []).filter((w) => w.code !== "RG_OUTSIDE_GUARD").map((w) => (w.code === "SELECT_FIXED_MOVED" ? "FIXED_MOVED" : "QUALITY_WARN") as DoeRankWarn);
     // v0.16.2 AD-D-8: 극단 요소(MORPH_EXTREME_ELEMENTS)도 순위 ⚠ — select 목 일부 안
     if (scenario === "select" && okRows.length % 7 === 1) warn.push("MORPH_EXTREME_ELEMENTS");
     okRows.push({ id: c.id, values: c.values, score: scoreOf(c.values, PARAMS), warn });
@@ -930,6 +944,62 @@ export function withLoadTransfer(res: DoeResultOut, entryIds: string[], lt: DoeL
   };
 }
 
+/** v0.21.0 목: STEP 면 수(결정적 — 이름에 huge = 2800 · mid = 1750, 그 밖 640~1340) */
+const mockFaces = (file: string, key: string) => (key.includes("huge") ? 2800 : key.includes("mid") ? 1750 : 640 + (parseInt(fnv(file).slice(0, 4), 16) % 700));
+
+/** v0.21.0 ④ 새 스냅샷 준비: 형상 행에 메싱 경로(route)·완화 직행(attempts·품질) + 준비 정보 MESH_ROUTE_RELAXED. STEP 행만(Case·메시 입력 형상은 경로 없음) */
+export function withShapeRoute(prep: NonNullable<DoeStudyOut["prep"]>, rules: DoeShapeRules): NonNullable<DoeStudyOut["prep"]> {
+  const rd = rules.mesh_route.relaxed_direct;
+  const infos: DoeWarning[] = [];
+  const shapes = (prep.shapes ?? []).map((r) => {
+    if (r.source !== "step" || r.status !== "READY") return r;
+    const key = `${r.name} ${r.file_name}`.toLowerCase();
+    const n_faces = mockFaces(r.file_name ?? r.id, key);
+    const direct = rd.enabled && rd.min_faces != null && n_faces >= rd.min_faces;
+    const route = { path: direct ? ("cad_relaxed" as const) : ("cad" as const), reason: direct ? ["faces" as const] : [], n_faces, step_mb: +(n_faces / 62).toFixed(1), min_faces: rd.min_faces, min_step_mb: rd.min_step_mb };
+    if (!direct) return { ...r, route };
+    infos.push({ code: "MESH_ROUTE_RELAXED", level: "info", id: r.id, name: r.name, n_faces, min_faces: rd.min_faces });
+    // 서버 실측 근사(이슈 #63): 큰 모델 cad_relaxed Fail 55.5 %·tria 21.9 % — mid 는 순위 경고 기준 아래
+    const bad = key.includes("huge");
+    const fail_ratio = bad ? 0.555 : 0.083;
+    const q = r.quality ? { ...r.quality, fail_ratio, fail_elems: Math.round((r.n_elems ?? 0) * fail_ratio), tria_pct: bad ? 21.9 : 12.4, over_limit: fail_ratio > r.quality.max_fail_ratio } : r.quality;
+    return {
+      ...r,
+      route,
+      mesh_path: "cad_relaxed" as const,
+      quality: q,
+      attempts: [{ stage: "cad", status: "SKIPPED", skipped: true, reason: "relaxed_direct" }, { stage: "cad_relaxed", status: "READY", seconds: 276 }],
+    };
+  });
+  const warnings = [...prep.warnings.filter((w) => w.code !== "SHAPE_QUALITY_FAIL"), ...infos];
+  for (const r of shapes)
+    if (r.quality?.over_limit)
+      warnings.push({ code: "SHAPE_QUALITY_FAIL", message: `${r.id} ${r.name}: 메시 품질 Fail 요소 비율 ${(r.quality.fail_ratio * 100).toFixed(2)} % > ${r.quality.max_fail_ratio * 100} % — 차단 아님` });
+  return { ...prep, shapes, warnings };
+}
+
+/** v0.21.0 ④ 새 스냅샷 결과: 메시 품질 미달 형상 = 순위 그대로 + 행 mq·warn + 결과 경고 + summary.best_clean_mq(§5.4, Q-SH-3 = A) */
+export function withMeshQualityRank(res: DoeResultOut, prep: NonNullable<DoeStudyOut["prep"]>, rules: DoeShapeRules): DoeResultOut {
+  const rq = rules.mesh_route.rank_quality;
+  const q = new Map((prep.shapes ?? []).map((r) => [r.id, r.quality]));
+  const flagged: { id: string; name: string; fail_ratio: number; tria_pct: number }[] = [];
+  const ranking = res.ranking.map((r) => {
+    const x = q.get(r.id);
+    if (!x) return r;
+    const over: ("fail" | "tria")[] = [...(x.fail_ratio > rq.fail_ratio ? (["fail"] as const) : []), ...(x.tria_pct > rq.tria_pct ? (["tria"] as const) : [])];
+    if (!over.length) return r;
+    flagged.push({ id: r.id, name: r.shape?.name ?? r.id, fail_ratio: x.fail_ratio, tria_pct: x.tria_pct });
+    return { ...r, mq: { fail_ratio: x.fail_ratio, tria_pct: x.tria_pct, over }, warn: [...(r.warn ?? []), "MESH_QUALITY_RANK" as const] };
+  });
+  const clean = ranking.find((r) => !r.mq)?.id ?? null;
+  return {
+    ...res,
+    ranking,
+    summary: { ...res.summary, best_clean_mq: clean },
+    warnings: flagged.length ? [...res.warnings, { code: "MESH_QUALITY_RANK", scope: "shapes", n: flagged.length, shapes: flagged }] : res.warnings,
+  };
+}
+
 export function makeCompareResult(prep: NonNullable<DoeStudyOut["prep"]>, entryIds: string[]): DoeResultOut {
   const rows = prep.shapes ?? [];
   const ref = rows.find((r) => r.reference) ?? rows[0];
@@ -1100,6 +1170,8 @@ export class DoeMock {
   seq = 0;
   /** 시험용: 다음 check-inputs 를 이 오류로 */
   checkError: MockResponse | null = null;
+  /** v0.21.0 시험·시연: true 면 새로 만든 스터디 스냅샷에 shape_rules(MOCK_SHAPE_RULES) — 기본 false = 옛 스냅샷(키 없음) */
+  shapeSnapshot = false;
   constructor(private ctx: DoeCtx) {}
 
   private id(prefix: string) {
@@ -1362,6 +1434,93 @@ export class DoeMock {
     this.recs.push(r17, r15, r16);
   }
 
+  /** v0.21.0 시연·시험(?demoShape=1): 새 스냅샷(shape_rules) — doe-30 ① 그래프 select(부분 W·guard 꼬리표·미리보기 RG_OUTSIDE_GUARD) · doe-31 ④ 형상 비교(완화 직행 칩·메시 품질 ⚠·품질 통과 최상위) ·
+   *  doe-32 ③ STEP 그래프(완화 직행·기준 메시 품질 미달 결과 띠). 옛 스냅샷 대응 = doe-10(select) · doe-20(④) */
+  demoShape() {
+    if (this.recs.some((r) => r.out.id === "doe-30")) return;
+    this.demoStepSel();
+    const es = this.recs[0].out.entry_ids;
+    const doneAt = (id: string, jt: JobType, t0: string, t1: string, compare = false) => {
+      const j = doneJob(this.id("j-doe"), "p-body", id, jt, t0, t1, compare);
+      this.seededJobs.push(j);
+      return j.id;
+    };
+    // ---- doe-30: ① 그래프 select — 저장 선택(자동 seed 20 비드) + 미리보기
+    const s10 = this.recs.find((r) => r.out.id === "doe-10")!;
+    const r30: Rec = {
+      ...s10,
+      out: { ...s10.out, id: "doe-30", title: "75형 Ch/R 비드 — 형상 규칙(v0.21)", created_at: "2026-11-15T01:00:00Z", doe: null, phase: "READY", version: 3, inputs: { ...s10.out.inputs, shape_rules: MOCK_SHAPE_RULES }, prep: this.graphPrep(false), selection: null },
+      jobIds: [],
+      cells: null,
+      result: null,
+      sel: null,
+      autoSel: graphAutoSeed(),
+    };
+    this.saveSelection(r30, r30.autoSel!.selection, "차완기");
+    const ps30 = this.paramsOf(r30);
+    r30.out.prep = { ...r30.out.prep!, n_beads: r30.sel!.input.beads.length, n_params: ps30.length };
+    const spec30: DoeSpec = { method: "lhs", n: 20, seed: 3, params: ps30.filter((x) => x.use_default).map((x) => ({ name: x.name, lo: x.default_range[0], hi: x.default_range[1] })) };
+    const m30 = makeMatrix(spec30, ps30);
+    r30.cells = this.selectCells(r30, m30);
+    r30.out.doe = { rev: 1, spec: m30.spec, matrix_sha256: m30.matrix_sha256, n_designs: m30.n_designs, preview: this.previewOf(1, m30, r30.cells, r30) };
+    r30.out.phase = "PREVIEW_READY";
+    r30.out.version = 5;
+    r30.jobIds.push(doneAt("doe-30", "DOE_PREP", "2026-11-15T01:00:05Z", "2026-11-15T01:03:00Z"), doneAt("doe-30", "DOE_PREVIEW", "2026-11-15T01:10:00Z", "2026-11-15T01:13:00Z"));
+    // ---- doe-31: ④ 형상 비교 — 큰 모델(huge)은 cad 없이 완화 직행 + 메시 품질 미달(순위 1위), 중간(mid)은 직행이지만 기준 이내
+    const shapes31 = compareIds(
+      ([["chr_base.step", "현행"], ["chr_huge_F.step", "F안(큰 모델)"], ["chr_rib_A.step", "리브 A안"], ["chr_mid_D.step", "D안(중간)"], ["chr_rib_B_rough.step", "리브 B안"]] as [string, string][]).map(([f, n], i) => ({ upload_id: "up-cmp-seed", rel: `rad/${f}`, name: n, reference: i === 0, file_name: f, sha256: shaOfFile(f) })),
+    );
+    const tmpl = this.recs.find((r) => r.out.id === "doe-20")!;
+    const lt31: DoeLoadTransferResolved = { method: "work", cell_size_mm: null, support: "transfer", region_mode: "auto" };
+    const r31: Rec = {
+      ...tmpl,
+      out: { ...tmpl.out, id: "doe-31", title: "Ch/R 형상 비교 — 큰 모델 완화 직행(v0.21)", created_at: "2026-11-15T02:00:00Z", inputs: { ...tmpl.out.inputs, shapes: shapes31, reference_source: "step", mesh_mode: "auto", mesh_refine: true, load_transfer: lt31, rank_metric: "lin", shape_rules: MOCK_SHAPE_RULES } },
+      jobIds: [],
+      cells: null,
+    };
+    r31.out.prep = withShapeRoute(makeComparePrep(shapes31, "step", "auto", true), MOCK_SHAPE_RULES);
+    r31.result = withLoadTransfer(withMeshQualityRank(makeCompareResult(r31.out.prep, r31.out.entry_ids), r31.out.prep, MOCK_SHAPE_RULES), r31.out.entry_ids, lt31, "compare");
+    r31.out.phase = "DONE";
+    r31.out.version = 4;
+    r31.jobIds.push(doneAt("doe-31", "DOE_PREP", "2026-11-15T02:00:05Z", "2026-11-15T02:06:00Z", true), doneAt("doe-31", "DOE_RUN", "2026-11-15T02:10:00Z", "2026-11-15T02:21:00Z", true));
+    // ---- doe-32: ③ STEP 그래프(완화 직행) — 기준 메시 품질 미달(모든 안이 같은 메시 → 결과 띠 1줄)
+    const s15 = this.recs.find((r) => r.out.id === "doe-15")!;
+    const prep32 = this.stepPrep("ok");
+    const nE = prep32.n_elems ?? 100_000;
+    prep32.mesh = {
+      ...prep32.mesh!,
+      route: { path: "cad_relaxed", reason: ["faces"], n_faces: 2800, step_mb: 45.1, min_faces: MOCK_SHAPE_RULES.mesh_route.relaxed_direct.min_faces, min_step_mb: null },
+      quality: { fail_ratio: 0.555, tria_pct: 21.9, fail_elems: Math.round(nE * 0.555), n_elems: nE },
+    };
+    prep32.warnings = [...prep32.warnings, { code: "MESH_ROUTE_RELAXED", level: "info", id: "d000", name: "기준 STEP", n_faces: 2800, min_faces: MOCK_SHAPE_RULES.mesh_route.relaxed_direct.min_faces }];
+    const r32: Rec = {
+      ...s15,
+      out: { ...s15.out, id: "doe-32", title: "QN80J Ch/R 비드 — STEP 그래프(완화 직행·품질 미달)", created_at: "2026-11-15T03:00:00Z", doe: null, phase: "READY", version: 3, selection: null, prep: prep32, inputs: { ...s15.out.inputs, shape_rules: MOCK_SHAPE_RULES, rank_metric: "lin", load_transfer: { method: "work", cell_size_mm: null } } },
+      jobIds: [],
+      cells: null,
+      result: null,
+      sel: null,
+      autoSel: stepAutoSeed(true),
+    };
+    this.saveSelection(r32, r32.autoSel!.selection, "차완기");
+    const ps32 = this.paramsOf(r32);
+    const spec32: DoeSpec = { method: "lhs", n: 16, seed: 5, params: ps32.filter((x) => x.use_default).map((x) => ({ name: x.name, lo: x.default_range[0], hi: x.default_range[1] })) };
+    const m32 = makeMatrix(spec32, ps32);
+    r32.cells = this.selectCells(r32, m32);
+    r32.out.doe = { rev: 1, spec: m32.spec, matrix_sha256: m32.matrix_sha256, n_designs: m32.n_designs, preview: this.previewOf(1, m32, r32.cells, r32) };
+    const res32 = makeResult(spec32, r32.cells, es, "select", ps32);
+    const q32 = prep32.mesh.quality!;
+    r32.result = {
+      ...res32,
+      summary: { ...res32.summary, mesh_quality: { fail_ratio: q32.fail_ratio, tria_pct: q32.tria_pct, warn: true } },
+      warnings: [...res32.warnings, { code: "MESH_QUALITY_RANK", scope: "base", fail_ratio: q32.fail_ratio, tria_pct: q32.tria_pct }],
+    };
+    r32.out.phase = "DONE";
+    r32.out.version = 6;
+    r32.jobIds.push(doneAt("doe-32", "DOE_PREP", "2026-11-15T03:00:05Z", "2026-11-15T03:05:00Z"), doneAt("doe-32", "DOE_PREVIEW", "2026-11-15T03:10:00Z", "2026-11-15T03:13:00Z"), doneAt("doe-32", "DOE_RUN", "2026-11-15T03:20:00Z", "2026-11-15T03:31:00Z"));
+    this.recs.push(r30, r31, r32);
+  }
+
   /** v0.17.1 시연·시험(?demoLadder=1): ③ 다른 모델(STEP만) 메싱 뒤 긴 사다리 경고 — doe-12 준비 완료(경고 접기) · doe-13 준비 실패(빨간 1줄) */
   demoLadder() {
     if (this.recs.some((r) => r.out.id === "doe-12")) return;
@@ -1437,10 +1596,12 @@ export class DoeMock {
     if (r.out.phase === "PREP" && j.job_type === "DOE_PREP" && r.out.scenario === "compare") {
       r.out.phase = "READY";
       r.out.prep = makeComparePrep(r.out.inputs.shapes ?? [], r.out.inputs.reference_source ?? "step", r.out.inputs.mesh_mode ?? null, r.out.inputs.mesh_refine !== false);
+      if (r.out.inputs.shape_rules) r.out.prep = withShapeRoute(r.out.prep, r.out.inputs.shape_rules);
       r.out.version += 1;
     }
     if (r.out.phase === "RUN" && j.job_type === "DOE_RUN" && r.out.scenario === "compare" && r.out.prep) {
       r.result = makeCompareResult(r.out.prep, r.out.entry_ids);
+      if (r.out.inputs.shape_rules) r.result = withMeshQualityRank(r.result, r.out.prep, r.out.inputs.shape_rules);
       if (r.out.inputs.load_transfer) r.result = withLoadTransfer(r.result, r.out.entry_ids, r.out.inputs.load_transfer, "compare");
       r.out.phase = "DONE";
       r.out.version += 1;
@@ -1545,17 +1706,23 @@ export class DoeMock {
   paramsOf(r: Rec): DoeParam[] {
     if (r.out.scenario !== "select") return DEFAULT_PARAMS;
     if (!r.sel) return [];
-    if (r.sel.input.schema_version === 2) return graphParams(r.sel.input).params;
+    if (r.sel.input.schema_version === 2) return graphParams(r.sel.input, r.out.inputs.shape_rules).params;
     return selParams(r.sel.input, r.sel.derived, this.settings.select?.fixed_policy ?? "warn").params;
   }
   private selectCells(r: Rec, m: DoeMatrixOut): DoePreviewCell[] {
     const ps = this.paramsOf(r);
     const pol = { fixed: this.settings.select?.fixed_policy ?? "warn", quality: this.settings.select?.quality_fail_policy ?? "warn" } as const;
-    return m.designs.filter((d) => d.id !== "d000").map((d) => ({ id: d.id, values: d.values, ...selCellStatus(d.id, d.values, ps, pol) }));
+    return m.designs.filter((d) => d.id !== "d000").map((d) => {
+      const c = { id: d.id, values: d.values, ...selCellStatus(d.id, d.values, ps, pol) };
+      // v0.21.0 §4.3: 안 값이 그 변수의 guard.usable 밖이면 셀 경고(경고만 — 상태·판정 불변)
+      const out = r.out.inputs.shape_rules ? ps.filter((p) => p.guard?.usable && d.values[p.name] != null && (d.values[p.name] < p.guard.usable[0] - 1e-9 || d.values[p.name] > p.guard.usable[1] + 1e-9)) : [];
+      if (!out.length || c.status !== "READY") return c;
+      return { ...c, warnings: [...(c.warnings ?? []), { code: "RG_OUTSIDE_GUARD" as const, vars: out.map((p) => ({ name: p.name, value: d.values[p.name], usable: p.guard!.usable! })) }] };
+    });
   }
   saveSelection(r: Rec, input: DoeSelectionAny, who: string) {
     if (input.schema_version === 2) {
-      const d = graphDerive(input).body as import("../api/types").DoeDeriveOut;
+      const d = graphDerive(input, r.out.inputs.shape_rules).body as import("../api/types").DoeDeriveOut;
       const rev = (r.sel?.rev ?? 0) + 1;
       r.sel = { rev, sha256: d.sha256, input, derived: { ...d, rev }, updated_by_name: who, updated_at: this.ctx.now() };
       return;
@@ -1664,19 +1831,19 @@ export class DoeMock {
     }
     if (method === "GET" && sub === "/select/graph") {
       if (!prepReady) return notReady();
-      return rec.graphFailed ? err(404, "GRAPH_NOT_AVAILABLE", "분류 결과가 없습니다(GRAPH_FAILED).") : ok(graphOut());
+      return rec.graphFailed ? err(404, "GRAPH_NOT_AVAILABLE", "분류 결과가 없습니다(GRAPH_FAILED).") : ok(graphOut(!!rec.out.inputs.shape_rules));
     }
     if (method === "POST" && sub === "/select/derive") {
       if (!prepReady) return notReady();
       const sel = b.selection as DoeSelectionV2 | undefined;
-      return graphValidate(sel, !rec.graphFailed) ?? graphDerive(sel!);
+      return graphValidate(sel, !rec.graphFailed, rec.out.inputs.shape_rules) ?? graphDerive(sel!, rec.out.inputs.shape_rules);
     }
     if (method === "PUT" && sub === "/selection") {
       if (!prepReady) return notReady();
       if (b.version !== rec.out.version) return err(409, "VERSION_CONFLICT", "다른 사용자가 먼저 바꿨습니다. 새로 고친 뒤 다시 시도하세요");
       if (rec.out.phase === "RUN" || rec.out.phase === "DONE") return err(409, "ALREADY_RUN", "이미 실행했습니다 — 복제해서 새 연구로.");
       const sel = b.selection as DoeSelectionV2 | undefined;
-      const bad = graphValidate(sel, !rec.graphFailed);
+      const bad = graphValidate(sel, !rec.graphFailed, rec.out.inputs.shape_rules);
       if (bad) return bad;
       this.saveSelection(rec, sel!, this.ctx.me().display_name);
       rec.out.version += 1;
@@ -1685,12 +1852,12 @@ export class DoeMock {
     }
     if (method === "GET" && sub === "/select/basis" && rec.sel?.input.schema_version === 2) {
       if (!rec.out.doe?.preview) return err(409, "PREVIEW_NOT_READY", "미리보기 전이라 기저가 없습니다.");
-      const bs = graphBasis(rec.sel.input);
+      const bs = graphBasis(rec.sel.input, rec.out.inputs.shape_rules);
       return query.get("meta") === "1" ? ok(bs.meta) : { status: 200, body: bs.bin };
     }
     if (method === "GET" && (sub === "/params" || sub === "/plan-view") && rec.sel?.input.schema_version === 2) {
       if (!prepReady) return notReady();
-      return ok(sub === "/params" ? graphParams(rec.sel.input) : rec.out.inputs.select_base === "step" ? stepPlan(rec.sel.input) : withBoundary(rec, graphPlan(rec.sel.input)));
+      return ok(sub === "/params" ? graphParams(rec.sel.input, rec.out.inputs.shape_rules) : rec.out.inputs.select_base === "step" ? stepPlan(rec.sel.input) : withBoundary(rec, graphPlan(rec.sel.input)));
     }
     return null;
   }
@@ -1986,6 +2153,7 @@ export class DoeMock {
     if (method === "POST" && path === "/doe/studies" && res?.status === 201 && this.recs.length > n0) {
       const rec = this.recs[this.recs.length - 1];
       rec.out.inputs.rank_metric = this.settings.rank?.metric ?? undefined; // v0.20.0 새 스터디 순위 지표 = 설정(기본 solve — SM-11)
+      if (this.shapeSnapshot) rec.out.inputs.shape_rules = MOCK_SHAPE_RULES; // v0.21.0 새 스냅샷(§2.1)
       if (!this.settings.load_transfer) return ok(this.studyOut(rec), 201);
       if (!rec.out.inputs.load_transfer) {
         rec.out.inputs.load_transfer = this.resolveLt(b);
