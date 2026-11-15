@@ -140,3 +140,81 @@ def test_summarize_unchanged():
                       "fail_by", "warn_by", "worst", "max_fail_ratio", "over_limit"}
     assert s["n_elems"] == 120 and s["fail_by"]["min_length"] == 0 and s["worst"]["quad_min_angle"] == pytest.approx(90.0)
     assert s["tria_pct"] == pytest.approx(100.0 * 40 / 120)
+
+
+# ---------------------------------------------------------------- v0.21.0 V-SH-4 guard_probe(esl_bead_shape_v021.md §4.1)
+def _patch(nx=6, ny=4, h=5.0):
+    """quad 격자 nx×ny + 위쪽 tria 띠(각 칸 2개) — 평면 z=0."""
+    xs = np.arange(nx + 1) * h
+    X = [[x, y * h, 0.0] for y in range(ny + 2) for x in xs]
+    n1 = nx + 1
+    C, T = [], []
+    for j in range(ny):
+        for i in range(nx):
+            a = j * n1 + i
+            C.append([a, a + 1, a + 1 + n1, a + n1])
+            T.append(4)
+    j = ny
+    for i in range(nx):
+        a = j * n1 + i
+        C += [[a, a + 1, a + 1 + n1, -1], [a, a + 1 + n1, a + n1, -1]]
+        T += [3, 3]
+    return np.asarray(X, float), np.asarray(C, np.int64), np.asarray(T, np.int8)
+
+
+def test_guard_probe_v_sh_4():
+    from esl.morph import core as mc
+    X0, C, T = _patch()
+    X0b = X0.copy()
+    X0b[8, 0] += 4.9                                   # 공칭부터 나쁜 quad 2개(jac ≈ 0.29 — 노드 8 = 1행 1열)
+    m_nom = mq.element_metrics(X0b, C, T)
+    flip, jlim, tlim = 60.0, 0.3, 10.0
+    X1 = X0b.copy()
+    X1[17, :2] += 2.5                                  # 노드 17 찌그러뜨림(새 jac < 0.3) + tria 꼭짓점(새 최소각 < 10°)
+    X1[40, 0] += 4.0
+    am = np.ones(C.shape[0], bool)
+    idx = np.flatnonzero(am)
+    p = mq.guard_probe(X0b, X1, C, T, idx, flip_deg=flip, jac_min=jlim, tria_angle_min_deg=tlim)
+    m1 = mq.element_metrics(X1, C, T)
+    q = T == 4
+    assert p["n_affected"] == C.shape[0]
+    assert p["jac_bad_new"] == int(np.sum(q & (m_nom["jacobian"] >= jlim) & (m1["jacobian"] < jlim)))
+    assert p["jac_bad_new"] >= 1
+    assert p["jac_min"] == float(m1["jacobian"][q].min())
+    bad0 = q & (m_nom["jacobian"] < jlim)
+    assert bad0.any() and p["jac_bad_new"] < int(np.sum(q & (m1["jacobian"] < jlim)))   # 공칭부터 나쁜 요소는 안 셈
+    t = ~q
+    assert p["tri_bad_new"] == int(np.sum(t & (m_nom["min_angle"] >= tlim) & (m1["min_angle"] < tlim)))
+    assert p["tri_angle_min"] == float(m1["min_angle"][t].min()) and p["tri_bad_new"] >= 1
+    assert p["inverted"] == mq.inverted_count(X0b, X1, C, T, idx, flip_deg=flip)
+    mesh = {"x0": X0b, "conn": C, "elem_type": T}
+    e = mc.extremes(mesh, X0b, X1, am, {"max_flip_deg": 0.0}, {"area_ratio_min": 10.0, "rot_warn_deg": 0.0})
+    assert e["area_ratio_min"] == mc._r(p["area_ratio_min"])
+    a0 = mq._area(X0b, C, T.astype(np.int64))
+    a1 = mq._area(X1, C, T.astype(np.int64))
+    assert p["area_ratio_min"] == float(np.min(a1 / np.maximum(a0, 1e-300)))
+    assert p["new_fail_ratio"] is None
+    off = mq.guard_probe(X0b, X1, C, T, idx, flip_deg=flip, jac_min=None, tria_angle_min_deg=None)
+    assert off["jac_bad_new"] == 0 and off["tri_bad_new"] == 0
+
+
+def test_guard_probe_inverted_matches_design_state():
+    """뒤집힘 = inverted_count = design_state 의 뒤집힘(affected_quality) — 같은 영향 요소에서 같은 수."""
+    X0, C, T = _patch()
+    X1 = X0.copy()
+    X1[8, 0] += 9.0                                    # quad 접힘
+    X1[37, 2] += 30.0
+    am = np.ones(C.shape[0], bool)
+    idx = np.flatnonzero(am)
+    p = mq.guard_probe(X0, X1, C, T, idx, flip_deg=60.0, jac_min=0.3, tria_angle_min_deg=10.0,
+                       qcfg=DEFAULTS["compare"]["quality"])
+    aq = mq.affected_quality({"x0": X0, "conn": C, "elem_type": T}, X1, am, DEFAULTS["compare"]["quality"],
+                             flip_deg=60.0)
+    assert p["inverted"] == aq["inverted"] == mq.inverted_count(X0, X1, C, T, idx, flip_deg=60.0) >= 2
+    assert p["new_fail_ratio"] == aq["new_fail_ratio"]
+    b = mq.guard_base(X0, C, T, idx, DEFAULTS["compare"]["quality"])
+    p2 = mq.guard_probe(X0, X1, C, T, idx, flip_deg=60.0, jac_min=0.3, tria_angle_min_deg=10.0,
+                        qcfg=DEFAULTS["compare"]["quality"], base=b)
+    assert p2 == p                                     # 공칭 재사용 = 같은 값
+    z = mq.guard_probe(X0, X0, C, T, np.zeros(0, np.int64), flip_deg=60.0, jac_min=0.3, tria_angle_min_deg=10.0)
+    assert z["n_affected"] == 0 and z["inverted"] == 0 and z["area_ratio_min"] is None

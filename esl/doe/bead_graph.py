@@ -999,7 +999,7 @@ def derive_obj_v2(mesh: dict, norm: dict, cfg: dict | None, graph: dict | None, 
             gb.w_cover = _r(sum(ln[s] for s in gb.w_seg_ids) / sum(ln.values()))
             gb.warnings.append({"code": "BG_W_PARTIAL", "level": "info", "bead": b["id"], "n_w": len(gb.w_seg_ids),
                                 "n_seg": len(ids), "cover": gb.w_cover,
-                                "no_w": [int(g2["segments"][s]["anchor"]) for s in ids if s not in gb.w_seg_ids]})
+                                "no_w": sorted(int(g2["segments"][s]["anchor"]) for s in ids if s not in gb.w_seg_ids)})
         Ds = [float(g2["segments"][s]["D"]) for s in ids]
         if max(Ds) - min(Ds) > float(sc["graph"]["sym_tol_mm"]):
             gb.warnings.append({"code": "BG_GROUP_NOMINAL_SPREAD", "bead": b["id"], "min": _r(min(Ds)), "max": _r(max(Ds))})
@@ -1837,14 +1837,14 @@ def _apply_single(b, typ: str, e: dict, nom: float) -> None:
     if e["state"] == "ok":
         return
     sides = [x["side"] for x in bad]
-    if e["state"] == "blocked":
+    if e["state"] == "limited" and not (u[0] < nom < u[1]):
+        g["state"] = "blocked"                          # 한쪽이 공칭에 붙음(그쪽 keep 0) — 축소 범위로 쓸 수 없어 막힘으로
+    if g["state"] == "blocked":
         if u[0] < u[1]:
             b.range_default[typ] = [_r(u[0]), _r(u[1])]
         b.warnings.append({"code": "RG_VAR_BLOCKED", "level": "warning", "bead": b.id, "var": name, "usable": u,
                            "reason": g["reason"]})
         return
-    if not (u[0] < nom < u[1]):
-        return                                          # 공칭을 엄격히 품지 못함 — 범위 그대로(안 판정이 받침)
     old = list(b.range_default[typ])
     b.range_default[typ] = [_r(u[0]), _r(u[1])]
     fe = list(b.range_feasible[typ])
