@@ -1,0 +1,1198 @@
+{
+  "bead": 5,
+  "steps_mm": [
+    0.05,
+    0.025,
+    0.0125
+  ],
+  "sample_interval_ms": 0.2,
+  "timing": "nominal touchdown + common physical time",
+  "comparison_mesh": "all protocols compared at common 1025 nodes",
+  "protocols": {
+    "corner": {
+      "mesh_elements": 960,
+      "dt_factor": 0.45,
+      "nominal_touchdown_ms": 0.1748306574527601,
+      "cases": {
+        "baseline": {
+          "peak_rms_mm": 5.028889205110613,
+          "peak_rms_time_s": 0.00940113,
+          "first_wall_impulse_bracket_ms": [
+            0.1613087,
+            0.1809462
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.91851,
+          "median_native_dt_us": 1.402609,
+          "energy_indicator": 0.06998087394367569,
+          "instantaneous_force_residual": 7.335506144818384e-06,
+          "momentum_residual": 0.004121207267306234,
+          "integration_seconds": 13.045229685987579,
+          "native_valid": true
+        },
+        "cal_b5_minus": {
+          "peak_rms_mm": 5.024403792167756,
+          "peak_rms_time_s": 0.00940117,
+          "first_wall_impulse_bracket_ms": [
+            0.16131009999999998,
+            0.1809479
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.962591,
+          "median_native_dt_us": 1.402622,
+          "energy_indicator": 0.06733656157976403,
+          "instantaneous_force_residual": 7.38874286805754e-06,
+          "momentum_residual": 0.004140021923093614,
+          "integration_seconds": 11.76009834400611,
+          "native_valid": true
+        },
+        "cal_b5_plus": {
+          "peak_rms_mm": 4.946548887160604,
+          "peak_rms_time_s": 0.00940108,
+          "first_wall_impulse_bracket_ms": [
+            0.16130730000000001,
+            0.18094469999999999
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.064015,
+          "median_native_dt_us": 1.4025910000000001,
+          "energy_indicator": 0.07153452712298496,
+          "instantaneous_force_residual": 5.7117619436159655e-06,
+          "momentum_residual": 0.0041045628165349655,
+          "integration_seconds": 11.674547799993888,
+          "native_valid": true
+        },
+        "check_b5_minus": {
+          "peak_rms_mm": 5.019695714361636,
+          "peak_rms_time_s": 0.00940115,
+          "first_wall_impulse_bracket_ms": [
+            0.1613094,
+            0.180947
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.941534,
+          "median_native_dt_us": 1.402615,
+          "energy_indicator": 0.06899368415995714,
+          "instantaneous_force_residual": 7.336868614817469e-05,
+          "momentum_residual": 0.004130743316133977,
+          "integration_seconds": 11.284096246992704,
+          "native_valid": true
+        },
+        "check_b5_plus": {
+          "peak_rms_mm": 5.009561312179259,
+          "peak_rms_time_s": 0.00940111,
+          "first_wall_impulse_bracket_ms": [
+            0.161308,
+            0.18094549999999998
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.998848,
+          "median_native_dt_us": 1.4026079999999999,
+          "energy_indicator": 0.07123622882389623,
+          "instantaneous_force_residual": 7.312718139992598e-05,
+          "momentum_residual": 0.0041144901199717965,
+          "integration_seconds": 10.857769773996552,
+          "native_valid": true
+        },
+        "audit_b5_0125_minus": {
+          "peak_rms_mm": 5.026073533356048,
+          "peak_rms_time_s": 0.00940114,
+          "first_wall_impulse_bracket_ms": [
+            0.161309,
+            0.1809466
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.932508,
+          "median_native_dt_us": 1.402611,
+          "energy_indicator": 0.06945736783239871,
+          "instantaneous_force_residual": 7.3241686124380695e-06,
+          "momentum_residual": 0.004127427638231543,
+          "integration_seconds": 11.373678965013823,
+          "native_valid": true
+        },
+        "audit_b5_0125_plus": {
+          "peak_rms_mm": 5.005735621813369,
+          "peak_rms_time_s": 0.00940112,
+          "first_wall_impulse_bracket_ms": [
+            0.16130830000000002,
+            0.18094580000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.964207,
+          "median_native_dt_us": 1.40261,
+          "energy_indicator": 0.06997178387605014,
+          "instantaneous_force_residual": 5.578510698915511e-06,
+          "momentum_residual": 0.004117825060682048,
+          "integration_seconds": 12.261492672987515,
+          "native_valid": true
+        }
+      },
+      "step_comparison": {
+        "0.05_to_0.025": {
+          "0_to_4ms": 0.12575987919437884,
+          "0_to_12ms": 0.34285459143653657,
+          "0_to_24ms": 0.48470768261114083,
+          "0_to_39ms": 0.576266831297709,
+          "4_to_12ms": 0.3484929258671028,
+          "12_to_24ms": 0.5027833459480174,
+          "24_to_39ms": 0.5922694428167825
+        },
+        "0.025_to_0.0125": {
+          "0_to_4ms": 0.3656414403189998,
+          "0_to_12ms": 0.35941481141044007,
+          "0_to_24ms": 0.42162465407092464,
+          "0_to_39ms": 0.4557356512197654,
+          "4_to_12ms": 0.3592269460690385,
+          "12_to_24ms": 0.4284323929020355,
+          "24_to_39ms": 0.46143285511337473
+        }
+      },
+      "central_asymmetry": {
+        "0.05": {
+          "0_to_4ms": 0.2535010163941397,
+          "0_to_12ms": 0.6135335157444981,
+          "0_to_24ms": 0.6940838384352319,
+          "0_to_39ms": 0.7572410883915357,
+          "4_to_12ms": 0.6239252140306827,
+          "12_to_24ms": 0.7113964495842728,
+          "24_to_39ms": 0.7748737028039052
+        },
+        "0.025": {
+          "0_to_4ms": 0.23823244254878242,
+          "0_to_12ms": 0.6133522429946959,
+          "0_to_24ms": 0.6798405819838372,
+          "0_to_39ms": 0.6620018593192348,
+          "4_to_12ms": 0.6232503009980983,
+          "12_to_24ms": 0.6893887595497427,
+          "24_to_39ms": 0.6585124772877312
+        },
+        "0.0125": {
+          "0_to_4ms": 0.3511912533915728,
+          "0_to_12ms": 0.6624631836494588,
+          "0_to_24ms": 0.7264433794842811,
+          "0_to_39ms": 0.6750942602887748,
+          "4_to_12ms": 0.6695468292451031,
+          "12_to_24ms": 0.7336918170382152,
+          "24_to_39ms": 0.6657228115823877
+        }
+      }
+    },
+    "half_step": {
+      "mesh_elements": 960,
+      "dt_factor": 0.225,
+      "nominal_touchdown_ms": 0.1748306574527601,
+      "cases": {
+        "baseline": {
+          "peak_rms_mm": 5.018461122284549,
+          "peak_rms_time_s": 0.00940043,
+          "first_wall_impulse_bracket_ms": [
+            0.1606073,
+            0.1802449
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.926148,
+          "median_native_dt_us": 0.7013057,
+          "energy_indicator": 0.07232441634752362,
+          "instantaneous_force_residual": 7.150390860277603e-06,
+          "momentum_residual": 0.00206154526292615,
+          "integration_seconds": 24.592085915995995,
+          "native_valid": true
+        },
+        "cal_b5_minus": {
+          "peak_rms_mm": 5.024582180192565,
+          "peak_rms_time_s": 0.00940048,
+          "first_wall_impulse_bracket_ms": [
+            0.1606088,
+            0.18024649999999998
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.95952,
+          "median_native_dt_us": 0.701311,
+          "energy_indicator": 0.06986786508622217,
+          "instantaneous_force_residual": 7.146458319970947e-06,
+          "momentum_residual": 0.0020688327270329456,
+          "integration_seconds": 21.34701932501048,
+          "native_valid": true
+        },
+        "cal_b5_plus": {
+          "peak_rms_mm": 4.96136179716869,
+          "peak_rms_time_s": 0.00940039,
+          "first_wall_impulse_bracket_ms": [
+            0.160606,
+            0.1802434
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.062413,
+          "median_native_dt_us": 0.7012953,
+          "energy_indicator": 0.07473878345148119,
+          "instantaneous_force_residual": 5.40328766181418e-06,
+          "momentum_residual": 0.0020532280785188536,
+          "integration_seconds": 22.99067540500255,
+          "native_valid": true
+        },
+        "check_b5_minus": {
+          "peak_rms_mm": 5.026872186572657,
+          "peak_rms_time_s": 0.00940045,
+          "first_wall_impulse_bracket_ms": [
+            0.160608,
+            0.18024569999999998
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.934905,
+          "median_native_dt_us": 0.7013081,
+          "energy_indicator": 0.07169724502066485,
+          "instantaneous_force_residual": 7.20231371620049e-06,
+          "momentum_residual": 0.0020638530952355404,
+          "integration_seconds": 24.845630842988612,
+          "native_valid": true
+        },
+        "check_b5_plus": {
+          "peak_rms_mm": 5.012034411323991,
+          "peak_rms_time_s": 0.00940041,
+          "first_wall_impulse_bracket_ms": [
+            0.1606066,
+            0.18024410000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.99799,
+          "median_native_dt_us": 0.7013048999999999,
+          "energy_indicator": 0.07431094390495256,
+          "instantaneous_force_residual": 5.562532610748081e-06,
+          "momentum_residual": 0.002056065777805889,
+          "integration_seconds": 22.202437704007025,
+          "native_valid": true
+        },
+        "audit_b5_0125_minus": {
+          "peak_rms_mm": 5.027186833245461,
+          "peak_rms_time_s": 0.00940044,
+          "first_wall_impulse_bracket_ms": [
+            0.1606077,
+            0.1802453
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.928657,
+          "median_native_dt_us": 0.7013054,
+          "energy_indicator": 0.07212819300260476,
+          "instantaneous_force_residual": 5.602327926473996e-06,
+          "momentum_residual": 0.0020627305126062236,
+          "integration_seconds": 22.80179379301262,
+          "native_valid": true
+        },
+        "audit_b5_0125_plus": {
+          "peak_rms_mm": 5.013419711861754,
+          "peak_rms_time_s": 0.00940042,
+          "first_wall_impulse_bracket_ms": [
+            0.160607,
+            0.1802445
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.942746,
+          "median_native_dt_us": 0.7013064,
+          "energy_indicator": 0.07266196122703719,
+          "instantaneous_force_residual": 7.243676117035547e-06,
+          "momentum_residual": 0.0020602976864560808,
+          "integration_seconds": 22.9215239220066,
+          "native_valid": true
+        }
+      },
+      "step_comparison": {
+        "0.05_to_0.025": {
+          "0_to_4ms": 0.015608818694132257,
+          "0_to_12ms": 0.2950127536245236,
+          "0_to_24ms": 0.45011480439444657,
+          "0_to_39ms": 0.5479766357730255,
+          "4_to_12ms": 0.3002900594572053,
+          "12_to_24ms": 0.4690997304960334,
+          "24_to_39ms": 0.5645644987206143
+        },
+        "0.025_to_0.0125": {
+          "0_to_4ms": 0.167598304119687,
+          "0_to_12ms": 0.2376115778079971,
+          "0_to_24ms": 0.3482534670342887,
+          "0_to_39ms": 0.4351781050589628,
+          "4_to_12ms": 0.23947088300005664,
+          "12_to_24ms": 0.358245428937992,
+          "24_to_39ms": 0.44743153453167755
+        }
+      },
+      "central_asymmetry": {
+        "0.05": {
+          "0_to_4ms": 0.10228334305588045,
+          "0_to_12ms": 0.5181079868135743,
+          "0_to_24ms": 0.6818463325557542,
+          "0_to_39ms": 0.8921450250622271,
+          "4_to_12ms": 0.5288808661966442,
+          "12_to_24ms": 0.7138953599849475,
+          "24_to_39ms": 0.9420341042069229
+        },
+        "0.025": {
+          "0_to_4ms": 0.04543633758128016,
+          "0_to_12ms": 0.3938557993130451,
+          "0_to_24ms": 0.5010581008427283,
+          "0_to_39ms": 0.673971535041215,
+          "4_to_12ms": 0.40082764452348973,
+          "12_to_24ms": 0.515311269449758,
+          "24_to_39ms": 0.7018732539529544
+        },
+        "0.0125": {
+          "0_to_4ms": 0.037958506795609435,
+          "0_to_12ms": 0.20406447032731317,
+          "0_to_24ms": 0.23453643668196955,
+          "0_to_39ms": 0.3730758348116704,
+          "4_to_12ms": 0.20712141336902207,
+          "12_to_24ms": 0.23761912758439863,
+          "24_to_39ms": 0.39058169895759715
+        }
+      },
+      "discretization_reference": "corner",
+      "baseline_field_error": {
+        "0_to_4ms": 0.0016787858299047909,
+        "0_to_12ms": 0.007069828476828963,
+        "0_to_24ms": 0.01707189641450013,
+        "0_to_39ms": 0.03807443119496507,
+        "4_to_12ms": 0.0074182175634739875,
+        "12_to_24ms": 0.021693789070576064,
+        "24_to_39ms": 0.061030988966082014
+      },
+      "gradient_change": {
+        "0.05": {
+          "0_to_4ms": 0.05027848982335357,
+          "0_to_12ms": 0.07518556380713708,
+          "0_to_24ms": 0.09370122037259582,
+          "0_to_39ms": 0.10749891043427945,
+          "4_to_12ms": 0.07608874474021093,
+          "12_to_24ms": 0.09742613839639747,
+          "24_to_39ms": 0.11101104967421097
+        },
+        "0.025": {
+          "0_to_4ms": 0.0704592619956092,
+          "0_to_12ms": 0.07843687065437352,
+          "0_to_24ms": 0.08639291272495792,
+          "0_to_39ms": 0.10807540968332334,
+          "4_to_12ms": 0.07871048265477792,
+          "12_to_24ms": 0.08753145706452652,
+          "24_to_39ms": 0.11170035293499418
+        },
+        "0.0125": {
+          "0_to_4ms": 0.1855011399823858,
+          "0_to_12ms": 0.18799427255206855,
+          "0_to_24ms": 0.15329138300279035,
+          "0_to_39ms": 0.15773037047842237,
+          "4_to_12ms": 0.18807169204706584,
+          "12_to_24ms": 0.1490249278883789,
+          "24_to_39ms": 0.15842388891262854
+        }
+      }
+    },
+    "quarter_step": {
+      "mesh_elements": 960,
+      "dt_factor": 0.1125,
+      "nominal_touchdown_ms": 0.1748306574527601,
+      "cases": {
+        "baseline": {
+          "peak_rms_mm": 5.020813499808126,
+          "peak_rms_time_s": 0.00940009,
+          "first_wall_impulse_bracket_ms": [
+            0.1602566,
+            0.1802449
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.923955,
+          "median_native_dt_us": 0.35065280000000004,
+          "energy_indicator": 0.07366023776960762,
+          "instantaneous_force_residual": 5.410592279715257e-06,
+          "momentum_residual": 0.0010308854523673771,
+          "integration_seconds": 46.98917051301396,
+          "native_valid": true
+        },
+        "cal_b5_minus": {
+          "peak_rms_mm": 5.026730084162531,
+          "peak_rms_time_s": 0.00940013,
+          "first_wall_impulse_bracket_ms": [
+            0.1602581,
+            0.18024649999999998
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.9592,
+          "median_native_dt_us": 0.3506555,
+          "energy_indicator": 0.07112548500636916,
+          "instantaneous_force_residual": 5.401011537315541e-06,
+          "momentum_residual": 0.0010341473844585074,
+          "integration_seconds": 43.21852945799765,
+          "native_valid": true
+        },
+        "cal_b5_plus": {
+          "peak_rms_mm": 4.958372006195144,
+          "peak_rms_time_s": 0.00940004,
+          "first_wall_impulse_bracket_ms": [
+            0.16025530000000002,
+            0.1802434
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.062648,
+          "median_native_dt_us": 0.3506475,
+          "energy_indicator": 0.07609703444155201,
+          "instantaneous_force_residual": 5.305238277813462e-06,
+          "momentum_residual": 0.0010268858579773677,
+          "integration_seconds": 41.90560620999895,
+          "native_valid": true
+        },
+        "check_b5_minus": {
+          "peak_rms_mm": 5.0269501624469495,
+          "peak_rms_time_s": 0.00940011,
+          "first_wall_impulse_bracket_ms": [
+            0.1602574,
+            0.18024569999999998
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.934201,
+          "median_native_dt_us": 0.3506539,
+          "energy_indicator": 0.07298405802105676,
+          "instantaneous_force_residual": 5.430466370413675e-06,
+          "momentum_residual": 0.0010341290739851181,
+          "integration_seconds": 42.14311822700256,
+          "native_valid": true
+        },
+        "check_b5_plus": {
+          "peak_rms_mm": 5.007159621290153,
+          "peak_rms_time_s": 0.00940007,
+          "first_wall_impulse_bracket_ms": [
+            0.160256,
+            0.18024410000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.00629,
+          "median_native_dt_us": 0.3506527,
+          "energy_indicator": 0.07590820141703213,
+          "instantaneous_force_residual": 5.435038827122129e-06,
+          "momentum_residual": 0.0010275992273002072,
+          "integration_seconds": 43.06360387100722,
+          "native_valid": true
+        },
+        "audit_b5_0125_minus": {
+          "peak_rms_mm": 5.025678479309428,
+          "peak_rms_time_s": 0.0094001,
+          "first_wall_impulse_bracket_ms": [
+            0.16025699999999998,
+            0.1802453
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.926003,
+          "median_native_dt_us": 0.350653,
+          "energy_indicator": 0.07338745392993602,
+          "instantaneous_force_residual": 7.232293254719246e-06,
+          "momentum_residual": 0.001030986938414402,
+          "integration_seconds": 44.21540065400768,
+          "native_valid": true
+        },
+        "audit_b5_0125_plus": {
+          "peak_rms_mm": 5.0161954625824645,
+          "peak_rms_time_s": 0.00940008,
+          "first_wall_impulse_bracket_ms": [
+            0.1602563,
+            0.1802445
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.934732,
+          "median_native_dt_us": 0.3506534,
+          "energy_indicator": 0.07409783841521313,
+          "instantaneous_force_residual": 7.306352262993546e-05,
+          "momentum_residual": 0.0010306663507493382,
+          "integration_seconds": 44.78652240500378,
+          "native_valid": true
+        }
+      },
+      "step_comparison": {
+        "0.05_to_0.025": {
+          "0_to_4ms": 0.015069742691970624,
+          "0_to_12ms": 0.2962534342783854,
+          "0_to_24ms": 0.4638386218636767,
+          "0_to_39ms": 0.5650734962303756,
+          "4_to_12ms": 0.30129844614554835,
+          "12_to_24ms": 0.4851452155000746,
+          "24_to_39ms": 0.5828322022230199
+        },
+        "0.025_to_0.0125": {
+          "0_to_4ms": 0.020023910452059143,
+          "0_to_12ms": 0.24191075154691116,
+          "0_to_24ms": 0.35436091003194914,
+          "0_to_39ms": 0.46754657305401304,
+          "4_to_12ms": 0.24572866395848209,
+          "12_to_24ms": 0.36405649107057936,
+          "24_to_39ms": 0.4824148478622252
+        }
+      },
+      "central_asymmetry": {
+        "0.05": {
+          "0_to_4ms": 0.11236910218340364,
+          "0_to_12ms": 0.5300950962839085,
+          "0_to_24ms": 0.6855654429862497,
+          "0_to_39ms": 0.902577673880625,
+          "4_to_12ms": 0.5409303048597413,
+          "12_to_24ms": 0.716919303398265,
+          "24_to_39ms": 0.9542218925538731
+        },
+        "0.025": {
+          "0_to_4ms": 0.09195037328144823,
+          "0_to_12ms": 0.43520881805990774,
+          "0_to_24ms": 0.5283201598612636,
+          "0_to_39ms": 0.7094419102411629,
+          "4_to_12ms": 0.44231019727938364,
+          "12_to_24ms": 0.5416300603508647,
+          "24_to_39ms": 0.7397180532680141
+        },
+        "0.0125": {
+          "0_to_4ms": 0.04915720381513768,
+          "0_to_12ms": 0.1953526079383064,
+          "0_to_24ms": 0.2283657247728243,
+          "0_to_39ms": 0.3694484427129642,
+          "4_to_12ms": 0.1982617127152568,
+          "12_to_24ms": 0.23152549214656454,
+          "24_to_39ms": 0.3863903780935819
+        }
+      },
+      "discretization_reference": "half_step",
+      "baseline_field_error": {
+        "0_to_4ms": 0.0006671807902012632,
+        "0_to_12ms": 0.0008231384636441618,
+        "0_to_24ms": 0.0019541451221267896,
+        "0_to_39ms": 0.004504922137182618,
+        "4_to_12ms": 0.0008381083155648367,
+        "12_to_24ms": 0.0024797375412850273,
+        "24_to_39ms": 0.007250319686783303
+      },
+      "gradient_change": {
+        "0.05": {
+          "0_to_4ms": 0.03017828320129242,
+          "0_to_12ms": 0.03369591443538198,
+          "0_to_24ms": 0.03843350541882113,
+          "0_to_39ms": 0.048861614870435006,
+          "4_to_12ms": 0.033839774101748626,
+          "12_to_24ms": 0.03945428018641843,
+          "24_to_39ms": 0.05138814848998031
+        },
+        "0.025": {
+          "0_to_4ms": 0.030888579427877292,
+          "0_to_12ms": 0.07120334418779067,
+          "0_to_24ms": 0.07784937417291031,
+          "0_to_39ms": 0.10269789063471818,
+          "4_to_12ms": 0.07219180009030089,
+          "12_to_24ms": 0.07885282965108503,
+          "24_to_39ms": 0.10688717786818189
+        },
+        "0.0125": {
+          "0_to_4ms": 0.1569884631573777,
+          "0_to_12ms": 0.12778748699552242,
+          "0_to_24ms": 0.09974116641992245,
+          "0_to_39ms": 0.09067699089259416,
+          "4_to_12ms": 0.12674092573973808,
+          "12_to_24ms": 0.09636069937182619,
+          "24_to_39ms": 0.08922031071561883
+        }
+      }
+    },
+    "fine_mesh": {
+      "mesh_elements": 3840,
+      "dt_factor": 0.45,
+      "nominal_touchdown_ms": 0.1748306574527601,
+      "cases": {
+        "baseline": {
+          "peak_rms_mm": 5.045237722776166,
+          "peak_rms_time_s": 0.0226006,
+          "first_wall_impulse_bracket_ms": [
+            0.1606625,
+            0.18030480000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 10.70124,
+          "median_native_dt_us": 0.7013685000000001,
+          "energy_indicator": 0.042671195044450716,
+          "instantaneous_force_residual": 4.046209661879328e-06,
+          "momentum_residual": 0.00037302790604214404,
+          "integration_seconds": 74.47953721300291,
+          "native_valid": true
+        },
+        "cal_b5_minus": {
+          "peak_rms_mm": 5.181458174213171,
+          "peak_rms_time_s": 0.0228004,
+          "first_wall_impulse_bracket_ms": [
+            0.1606625,
+            0.18030480000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 10.67622,
+          "median_native_dt_us": 0.7013689000000001,
+          "energy_indicator": 0.0432318824917372,
+          "instantaneous_force_residual": 1.9798434893837318e-05,
+          "momentum_residual": 0.00037308409088345976,
+          "integration_seconds": 71.76607279801101,
+          "native_valid": true
+        },
+        "cal_b5_plus": {
+          "peak_rms_mm": 4.898004869090501,
+          "peak_rms_time_s": 0.0224,
+          "first_wall_impulse_bracket_ms": [
+            0.1606625,
+            0.18030480000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 10.72128,
+          "median_native_dt_us": 0.7013696,
+          "energy_indicator": 0.042946142791209015,
+          "instantaneous_force_residual": 1.9702955919449122e-05,
+          "momentum_residual": 0.0003729582274354081,
+          "integration_seconds": 70.9868602540082,
+          "native_valid": true
+        },
+        "check_b5_minus": {
+          "peak_rms_mm": 5.1209692710270165,
+          "peak_rms_time_s": 0.0228004,
+          "first_wall_impulse_bracket_ms": [
+            0.1606625,
+            0.18030480000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 10.68841,
+          "median_native_dt_us": 0.7013683,
+          "energy_indicator": 0.04296553711621289,
+          "instantaneous_force_residual": 7.1626774220282076e-06,
+          "momentum_residual": 0.00037303699351924277,
+          "integration_seconds": 71.51854983900557,
+          "native_valid": true
+        },
+        "check_b5_plus": {
+          "peak_rms_mm": 4.977090621668533,
+          "peak_rms_time_s": 0.0226006,
+          "first_wall_impulse_bracket_ms": [
+            0.1606625,
+            0.18030480000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 10.71222,
+          "median_native_dt_us": 0.7013678000000001,
+          "energy_indicator": 0.04274365757470002,
+          "instantaneous_force_residual": 7.5032919954297495e-06,
+          "momentum_residual": 0.0003729799974260932,
+          "integration_seconds": 72.95695797300141,
+          "native_valid": true
+        },
+        "audit_b5_0125_minus": {
+          "peak_rms_mm": 5.087186754468773,
+          "peak_rms_time_s": 0.0228004,
+          "first_wall_impulse_bracket_ms": [
+            0.1606625,
+            0.18030480000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 10.6946,
+          "median_native_dt_us": 0.7013694,
+          "energy_indicator": 0.04280552382696352,
+          "instantaneous_force_residual": 5.744061617263564e-06,
+          "momentum_residual": 0.00037303030404684504,
+          "integration_seconds": 72.3366908050084,
+          "native_valid": true
+        },
+        "audit_b5_0125_plus": {
+          "peak_rms_mm": 5.020601038288507,
+          "peak_rms_time_s": 0.0226006,
+          "first_wall_impulse_bracket_ms": [
+            0.1606625,
+            0.18030480000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 10.70666,
+          "median_native_dt_us": 0.7013684,
+          "energy_indicator": 0.0427081758901186,
+          "instantaneous_force_residual": 3.9655925389911594e-06,
+          "momentum_residual": 0.0003729872044738791,
+          "integration_seconds": 72.85788976799813,
+          "native_valid": true
+        }
+      },
+      "step_comparison": {
+        "0.05_to_0.025": {
+          "0_to_4ms": 0.031806046464402986,
+          "0_to_12ms": 0.025681774863525443,
+          "0_to_24ms": 0.037679220384537,
+          "0_to_39ms": 0.13558533329589503,
+          "4_to_12ms": 0.02520730414523687,
+          "12_to_24ms": 0.03837227838036036,
+          "24_to_39ms": 0.14385291169899833
+        },
+        "0.025_to_0.0125": {
+          "0_to_4ms": 0.12166426736111335,
+          "0_to_12ms": 0.13711268743412386,
+          "0_to_24ms": 0.10496416936625284,
+          "0_to_39ms": 0.11595986758204778,
+          "4_to_12ms": 0.13812251775254172,
+          "12_to_24ms": 0.10202686995033024,
+          "24_to_39ms": 0.11738904037133946
+        }
+      },
+      "central_asymmetry": {
+        "0.05": {
+          "0_to_4ms": 0.07629321113555798,
+          "0_to_12ms": 0.10993070955754089,
+          "0_to_24ms": 0.1819361069483771,
+          "0_to_39ms": 0.4433979807225823,
+          "4_to_12ms": 0.11187403721373583,
+          "12_to_24ms": 0.18588409631939076,
+          "24_to_39ms": 0.46797645128299287
+        },
+        "0.025": {
+          "0_to_4ms": 0.1295512583429627,
+          "0_to_12ms": 0.1599559489549927,
+          "0_to_24ms": 0.14119095768178472,
+          "0_to_39ms": 0.2733577228741305,
+          "4_to_12ms": 0.16183195385693872,
+          "12_to_24ms": 0.13979649652158124,
+          "24_to_39ms": 0.2866813989752628
+        },
+        "0.0125": {
+          "0_to_4ms": 0.3795196946358129,
+          "0_to_12ms": 0.4653062355921929,
+          "0_to_24ms": 0.36279977525297985,
+          "0_to_39ms": 0.29958629393590636,
+          "4_to_12ms": 0.4706896174696112,
+          "12_to_24ms": 0.3535420907897229,
+          "24_to_39ms": 0.2898336857895349
+        }
+      },
+      "discretization_reference": "corner",
+      "baseline_field_error": {
+        "0_to_4ms": 2.209782274824978,
+        "0_to_12ms": 2.056533874945264,
+        "0_to_24ms": 1.9847759107393437,
+        "0_to_39ms": 1.9305343370896546,
+        "4_to_12ms": 2.0458696673365155,
+        "12_to_24ms": 1.9462411411006038,
+        "24_to_39ms": 1.8515861214345113
+      },
+      "gradient_change": {
+        "0.05": {
+          "0_to_4ms": 3.0626418764496424,
+          "0_to_12ms": 3.882703362465061,
+          "0_to_24ms": 2.6954424609848213,
+          "0_to_39ms": 2.2680795502576374,
+          "4_to_12ms": 3.9328495886993267,
+          "12_to_24ms": 2.5934072136530912,
+          "24_to_39ms": 2.203081900809411
+        },
+        "0.025": {
+          "0_to_4ms": 2.9020988890580504,
+          "0_to_12ms": 3.7726217710020498,
+          "0_to_24ms": 3.096865717817915,
+          "0_to_39ms": 2.8306670768503586,
+          "4_to_12ms": 3.825070539840511,
+          "12_to_24ms": 3.044455124849171,
+          "24_to_39ms": 2.7924508999608464
+        },
+        "0.0125": {
+          "0_to_4ms": 3.6182574693763874,
+          "0_to_12ms": 5.348431196334878,
+          "0_to_24ms": 4.837985456523266,
+          "0_to_39ms": 4.479690661249164,
+          "4_to_12ms": 5.448332448171428,
+          "12_to_24ms": 4.795819817163417,
+          "24_to_39ms": 4.428239398187693
+        }
+      }
+    },
+    "clearance_shift": {
+      "mesh_elements": 960,
+      "dt_factor": 0.45,
+      "nominal_touchdown_ms": 0.1806598511696348,
+      "cases": {
+        "baseline": {
+          "peak_rms_mm": 5.030013550039187,
+          "peak_rms_time_s": 0.00940113,
+          "first_wall_impulse_bracket_ms": [
+            0.1613087,
+            0.1809462
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.91703,
+          "median_native_dt_us": 1.402609,
+          "energy_indicator": 0.07005019633394861,
+          "instantaneous_force_residual": 5.505585515001061e-06,
+          "momentum_residual": 0.0041060126084208224,
+          "integration_seconds": 10.672383643992362,
+          "native_valid": true
+        },
+        "cal_b5_minus": {
+          "peak_rms_mm": 5.022932630436038,
+          "peak_rms_time_s": 0.00940117,
+          "first_wall_impulse_bracket_ms": [
+            0.16131009999999998,
+            0.1809479
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.96197,
+          "median_native_dt_us": 1.402622,
+          "energy_indicator": 0.06732970262469455,
+          "instantaneous_force_residual": 7.481273129257793e-06,
+          "momentum_residual": 0.004118480174436826,
+          "integration_seconds": 11.605210026988061,
+          "native_valid": true
+        },
+        "cal_b5_plus": {
+          "peak_rms_mm": 4.944691836746123,
+          "peak_rms_time_s": 0.00940108,
+          "first_wall_impulse_bracket_ms": [
+            0.16130730000000001,
+            0.18094469999999999
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.063395,
+          "median_native_dt_us": 1.4025919999999998,
+          "energy_indicator": 0.07153508824606816,
+          "instantaneous_force_residual": 5.732817082887034e-06,
+          "momentum_residual": 0.004089316046606346,
+          "integration_seconds": 12.02275926299626,
+          "native_valid": true
+        },
+        "check_b5_minus": {
+          "peak_rms_mm": 5.027882532663763,
+          "peak_rms_time_s": 0.00940115,
+          "first_wall_impulse_bracket_ms": [
+            0.1613094,
+            0.180947
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.937369,
+          "median_native_dt_us": 1.402617,
+          "energy_indicator": 0.06904287916935037,
+          "instantaneous_force_residual": 7.483878757482935e-06,
+          "momentum_residual": 0.004113878658235935,
+          "integration_seconds": 11.114324829002726,
+          "native_valid": true
+        },
+        "check_b5_plus": {
+          "peak_rms_mm": 5.015563215290736,
+          "peak_rms_time_s": 0.00940111,
+          "first_wall_impulse_bracket_ms": [
+            0.161308,
+            0.18094549999999998
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 8.987711,
+          "median_native_dt_us": 1.402607,
+          "energy_indicator": 0.07092473447597435,
+          "instantaneous_force_residual": 7.3524366587076095e-06,
+          "momentum_residual": 0.004097622357379214,
+          "integration_seconds": 12.278117704991018,
+          "native_valid": true
+        }
+      },
+      "step_comparison": {
+        "0.05_to_0.025": {
+          "0_to_4ms": 0.08893475980366876,
+          "0_to_12ms": 0.35678140075245357,
+          "0_to_24ms": 0.49897011839210603,
+          "0_to_39ms": 0.5773414890441839,
+          "4_to_12ms": 0.36304956995270865,
+          "12_to_24ms": 0.5159019945517933,
+          "24_to_39ms": 0.5905771049884129
+        }
+      },
+      "central_asymmetry": {
+        "0.05": {
+          "0_to_4ms": 0.27375311862557866,
+          "0_to_12ms": 0.628577359746119,
+          "0_to_24ms": 0.7058854286939867,
+          "0_to_39ms": 0.7535154350982666,
+          "4_to_12ms": 0.6390031046177043,
+          "12_to_24ms": 0.7227776611480043,
+          "24_to_39ms": 0.7670166196247132
+        },
+        "0.025": {
+          "0_to_4ms": 0.11872655812986552,
+          "0_to_12ms": 0.5019099580671424,
+          "0_to_24ms": 0.5663887462518973,
+          "0_to_39ms": 0.577007417695433,
+          "4_to_12ms": 0.5107854376606855,
+          "12_to_24ms": 0.5749121487338313,
+          "24_to_39ms": 0.5789322504922503
+        }
+      },
+      "discretization_reference": "corner",
+      "baseline_field_error": {
+        "0_to_4ms": 0.00309568312651301,
+        "0_to_12ms": 0.001615887531527573,
+        "0_to_24ms": 0.002023653550849395,
+        "0_to_39ms": 0.003508367922564724,
+        "4_to_12ms": 0.0013663349999531967,
+        "12_to_24ms": 0.002276822434465334,
+        "24_to_39ms": 0.005315058741279284
+      },
+      "gradient_change": {
+        "0.05": {
+          "0_to_4ms": 0.02147598680196334,
+          "0_to_12ms": 0.013869939323021415,
+          "0_to_24ms": 0.01710413360607557,
+          "0_to_39ms": 0.015870096354147278,
+          "4_to_12ms": 0.013463963214039166,
+          "12_to_24ms": 0.01777598321906102,
+          "24_to_39ms": 0.015486847005914994
+        },
+        "0.025": {
+          "0_to_4ms": 0.052961103203923804,
+          "0_to_12ms": 0.1032393013471182,
+          "0_to_24ms": 0.14187879134556666,
+          "0_to_39ms": 0.18212163568538747,
+          "4_to_12ms": 0.10466694877877246,
+          "12_to_24ms": 0.1465166966680978,
+          "24_to_39ms": 0.18856756561402213
+        }
+      }
+    },
+    "near_flat": {
+      "mesh_elements": 960,
+      "dt_factor": 0.45,
+      "nominal_touchdown_ms": 0.1748306574527601,
+      "cases": {
+        "baseline": {
+          "peak_rms_mm": 6.225805563574945,
+          "peak_rms_time_s": 0.0120012,
+          "first_wall_impulse_bracket_ms": [
+            0.1613087,
+            0.1809462
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.343848,
+          "median_native_dt_us": 1.402644,
+          "energy_indicator": 0.13113711460771318,
+          "instantaneous_force_residual": 3.4425455152174216e-06,
+          "momentum_residual": 0.0002811041431685609,
+          "integration_seconds": 13.134715316002257,
+          "native_valid": true
+        },
+        "cal_b5_minus": {
+          "peak_rms_mm": 6.2110489607711274,
+          "peak_rms_time_s": 0.0120013,
+          "first_wall_impulse_bracket_ms": [
+            0.16131009999999998,
+            0.1809479
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.333397,
+          "median_native_dt_us": 1.402658,
+          "energy_indicator": 0.1331412949566844,
+          "instantaneous_force_residual": 3.3425343784659606e-06,
+          "momentum_residual": 0.0004188644791175353,
+          "integration_seconds": 10.94766814900504,
+          "native_valid": true
+        },
+        "cal_b5_plus": {
+          "peak_rms_mm": 6.238415912307524,
+          "peak_rms_time_s": 0.0120011,
+          "first_wall_impulse_bracket_ms": [
+            0.16130730000000001,
+            0.18094469999999999
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.363345,
+          "median_native_dt_us": 1.402635,
+          "energy_indicator": 0.13480605421894756,
+          "instantaneous_force_residual": 3.463635429331381e-06,
+          "momentum_residual": 0.0002522659176889365,
+          "integration_seconds": 10.198174935998395,
+          "native_valid": true
+        },
+        "check_b5_minus": {
+          "peak_rms_mm": 6.219658236646871,
+          "peak_rms_time_s": 0.0120012,
+          "first_wall_impulse_bracket_ms": [
+            0.1613094,
+            0.180947
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.326267,
+          "median_native_dt_us": 1.402652,
+          "energy_indicator": 0.1403084808205338,
+          "instantaneous_force_residual": 3.435324036413896e-06,
+          "momentum_residual": 0.0004336358667957056,
+          "integration_seconds": 10.573180398001568,
+          "native_valid": true
+        },
+        "check_b5_plus": {
+          "peak_rms_mm": 6.230367510658347,
+          "peak_rms_time_s": 0.0120011,
+          "first_wall_impulse_bracket_ms": [
+            0.161308,
+            0.18094549999999998
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.352073,
+          "median_native_dt_us": 1.402641,
+          "energy_indicator": 0.13327278281906665,
+          "instantaneous_force_residual": 4.448843838912091e-06,
+          "momentum_residual": 0.00030128228355522064,
+          "integration_seconds": 11.11942205199739,
+          "native_valid": true
+        },
+        "audit_b5_0125_minus": {
+          "peak_rms_mm": 6.2233581829365665,
+          "peak_rms_time_s": 0.0120012,
+          "first_wall_impulse_bracket_ms": [
+            0.161309,
+            0.1809466
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.320311,
+          "median_native_dt_us": 1.402649,
+          "energy_indicator": 0.1418777069681207,
+          "instantaneous_force_residual": 4.2550682209931136e-06,
+          "momentum_residual": 0.00023039773243003624,
+          "integration_seconds": 11.223136037006043,
+          "native_valid": true
+        },
+        "audit_b5_0125_plus": {
+          "peak_rms_mm": 6.228028101748115,
+          "peak_rms_time_s": 0.0120011,
+          "first_wall_impulse_bracket_ms": [
+            0.16130830000000002,
+            0.18094580000000002
+          ],
+          "first_field_frame_contact_node_ids": [
+            1
+          ],
+          "final_normal_impulse_ns": 9.339616,
+          "median_native_dt_us": 1.402641,
+          "energy_indicator": 0.12841811806935352,
+          "instantaneous_force_residual": 2.8676094213799257e-06,
+          "momentum_residual": 0.00026618347049662205,
+          "integration_seconds": 11.679171846000827,
+          "native_valid": true
+        }
+      },
+      "step_comparison": {
+        "0.05_to_0.025": {
+          "0_to_4ms": 0.04585287831992856,
+          "0_to_12ms": 0.16305358074514853,
+          "0_to_24ms": 0.3296653639975067,
+          "0_to_39ms": 0.49851441474027836,
+          "4_to_12ms": 0.16679211637548874,
+          "12_to_24ms": 0.33094071595484886,
+          "24_to_39ms": 0.5156855443426703
+        },
+        "0.025_to_0.0125": {
+          "0_to_4ms": 0.07309994686393165,
+          "0_to_12ms": 0.23444814371334946,
+          "0_to_24ms": 0.4616329059471862,
+          "0_to_39ms": 0.5076127338500722,
+          "4_to_12ms": 0.2395483414988244,
+          "12_to_24ms": 0.46275240352093766,
+          "24_to_39ms": 0.512116613231028
+        }
+      },
+      "central_asymmetry": {
+        "0.05": {
+          "0_to_4ms": 0.05386385126136311,
+          "0_to_12ms": 0.20444666702054007,
+          "0_to_24ms": 0.5326208432131383,
+          "0_to_39ms": 0.9406496957036657,
+          "4_to_12ms": 0.20917670123636048,
+          "12_to_24ms": 0.535693575706378,
+          "24_to_39ms": 0.9900664203902383
+        },
+        "0.025": {
+          "0_to_4ms": 0.06709119584367607,
+          "0_to_12ms": 0.33017858445182385,
+          "0_to_24ms": 0.48038588335173504,
+          "0_to_39ms": 0.795633423345283,
+          "4_to_12ms": 0.338056055938531,
+          "12_to_24ms": 0.481684674500018,
+          "24_to_39ms": 0.8265162635159174
+        },
+        "0.0125": {
+          "0_to_4ms": 0.10859198090619662,
+          "0_to_12ms": 0.6489254410157725,
+          "0_to_24ms": 0.4376604088064771,
+          "0_to_39ms": 0.5757897542365,
+          "4_to_12ms": 0.6641121031691913,
+          "12_to_24ms": 0.4359408556984383,
+          "24_to_39ms": 0.5881838738126628
+        }
+      }
+    }
+  }
+}

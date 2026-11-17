@@ -178,25 +178,76 @@ def summary(out):
     return result
 
 
+def inclination(out, solver=None, jobs=1):
+    """Compare 90 and 60 degrees at the matched ~0.7 us native increment."""
+    variants = settings()
+    _, coarse, _, _ = variants['half_step']
+    _, fine, _, _ = variants['fine_mesh']
+    inclined_coarse, inclined_fine = deepcopy(coarse), deepcopy(fine)
+    for cfg in (inclined_coarse, inclined_fine):
+        cfg['drop']['panel_tilt_deg'] = 60.
+    labels = ('baseline', *PAIRS[1])
+    if solver:
+        provenance_path = out/'sensitivity_solver.json'
+        provenance = executable_provenance(solver)
+        if not provenance_path.exists() or read(provenance_path) != provenance:
+            raise ValueError('Run the main audit with these solver binaries before the inclination check')
+        requested = [(out/directory, solver, cfg, case, multiplier)
+                     for directory, cfg, multiplier in [('inclined_coarse', inclined_coarse, 1),
+                                                        ('inclined_fine', inclined_fine, 2)]
+                     for case in cfg['cases'] if case['id'] in labels]
+        with ProcessPoolExecutor(max_workers=jobs) as executor:
+            list(executor.map(execute, requested))
+
+    x_reference = load(out/'corner/runs/baseline/input_mesh.npz')['x0']
+    times = np.arange(196)*.0002
+    comparison = {'times_after_touchdown_ms': [float(times[0]*1000), float(times[-1]*1000)],
+                  'bead5_fd_step_mm': STEPS[1]}
+    for name, regular, refined in [
+        ('vertical_matched_step', ('half_step', coarse), ('corner', fine)),
+        ('inclined_matched_step', ('inclined_coarse', inclined_coarse), ('inclined_fine', inclined_fine)),
+    ]:
+        responses, diagnostics = [], []
+        for multiplier, (folder, cfg) in enumerate((regular, refined), start=1):
+            suffix = '_fine' if multiplier == 2 else ''
+            records = [native_fields(out/folder/'runs'/(label+suffix), cfg, times, multiplier, x_reference)
+                       for label in labels]
+            responses.append([r[0] for r in records])
+            diagnostics.append(dict(folder=folder, multiplier=multiplier, cases=dict(zip(labels,[r[2] for r in records]))))
+        a, b = responses
+        comparison[name] = dict(
+            baseline_field_error=relative_error(a[0],b[0]),
+            gradient_field_error=relative_error(a[2]-a[1], b[2]-b[1]),
+            diagnostics=diagnostics,
+        )
+    write(out/'inclination_comparison.json', comparison)
+    return comparison
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--solver', type=Path, help='Run native cases before summarizing')
     parser.add_argument('--jobs', type=int, default=1)
+    parser.add_argument('--inclination', action='store_true', help='Check a 60-degree corner pose after the main audit')
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error('--jobs must be positive')
     args.out = args.out.resolve()
     args.out.mkdir(parents=True, exist_ok=True)
+    report = inclination if args.inclination else summary
     if args.solver:
         import fcntl
 
         with (args.out/'.sensitivity.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            run(args.out, args.solver.resolve(), args.jobs)
-            summary(args.out)
+            if args.inclination:
+                inclination(args.out, args.solver.resolve(), args.jobs)
+            else:
+                run(args.out, args.solver.resolve(), args.jobs)
+                summary(args.out)
     else:
-        summary(args.out)
+        report(args.out)
 
 
 if __name__ == '__main__':

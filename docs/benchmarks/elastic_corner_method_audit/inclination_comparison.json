@@ -1,0 +1,259 @@
+{
+  "times_after_touchdown_ms": [
+    0.0,
+    39.0
+  ],
+  "bead5_fd_step_mm": 0.025,
+  "vertical_matched_step": {
+    "baseline_field_error": 1.9208390844213328,
+    "gradient_field_error": 3.000317929173569,
+    "diagnostics": [
+      {
+        "folder": "half_step",
+        "multiplier": 1,
+        "cases": {
+          "baseline": {
+            "peak_rms_mm": 5.018461122284549,
+            "peak_rms_time_s": 0.00940043,
+            "first_wall_impulse_bracket_ms": [
+              0.1606073,
+              0.1802449
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 8.926148,
+            "median_native_dt_us": 0.7013057,
+            "energy_indicator": 0.07232441634752362,
+            "instantaneous_force_residual": 7.150390860277603e-06,
+            "momentum_residual": 0.00206154526292615,
+            "integration_seconds": 24.592085915995995,
+            "native_valid": true
+          },
+          "check_b5_minus": {
+            "peak_rms_mm": 5.026872186572657,
+            "peak_rms_time_s": 0.00940045,
+            "first_wall_impulse_bracket_ms": [
+              0.160608,
+              0.18024569999999998
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 8.934905,
+            "median_native_dt_us": 0.7013081,
+            "energy_indicator": 0.07169724502066485,
+            "instantaneous_force_residual": 7.20231371620049e-06,
+            "momentum_residual": 0.0020638530952355404,
+            "integration_seconds": 24.845630842988612,
+            "native_valid": true
+          },
+          "check_b5_plus": {
+            "peak_rms_mm": 5.012034411323991,
+            "peak_rms_time_s": 0.00940041,
+            "first_wall_impulse_bracket_ms": [
+              0.1606066,
+              0.18024410000000002
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 8.99799,
+            "median_native_dt_us": 0.7013048999999999,
+            "energy_indicator": 0.07431094390495256,
+            "instantaneous_force_residual": 5.562532610748081e-06,
+            "momentum_residual": 0.002056065777805889,
+            "integration_seconds": 22.202437704007025,
+            "native_valid": true
+          }
+        }
+      },
+      {
+        "folder": "corner",
+        "multiplier": 2,
+        "cases": {
+          "baseline": {
+            "peak_rms_mm": 5.045237722776166,
+            "peak_rms_time_s": 0.0226006,
+            "first_wall_impulse_bracket_ms": [
+              0.1606625,
+              0.18030480000000002
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 10.70124,
+            "median_native_dt_us": 0.7013685000000001,
+            "energy_indicator": 0.042671195044450716,
+            "instantaneous_force_residual": 4.046209661879328e-06,
+            "momentum_residual": 0.00037302790604214404,
+            "integration_seconds": 74.47953721300291,
+            "native_valid": true
+          },
+          "check_b5_minus": {
+            "peak_rms_mm": 5.1209692710270165,
+            "peak_rms_time_s": 0.0228004,
+            "first_wall_impulse_bracket_ms": [
+              0.1606625,
+              0.18030480000000002
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 10.68841,
+            "median_native_dt_us": 0.7013683,
+            "energy_indicator": 0.04296553711621289,
+            "instantaneous_force_residual": 7.1626774220282076e-06,
+            "momentum_residual": 0.00037303699351924277,
+            "integration_seconds": 71.51854983900557,
+            "native_valid": true
+          },
+          "check_b5_plus": {
+            "peak_rms_mm": 4.977090621668533,
+            "peak_rms_time_s": 0.0226006,
+            "first_wall_impulse_bracket_ms": [
+              0.1606625,
+              0.18030480000000002
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 10.71222,
+            "median_native_dt_us": 0.7013678000000001,
+            "energy_indicator": 0.04274365757470002,
+            "instantaneous_force_residual": 7.5032919954297495e-06,
+            "momentum_residual": 0.0003729799974260932,
+            "integration_seconds": 72.95695797300141,
+            "native_valid": true
+          }
+        }
+      }
+    ]
+  },
+  "inclined_matched_step": {
+    "baseline_field_error": 0.021572236470986297,
+    "gradient_field_error": 0.33399774952013855,
+    "diagnostics": [
+      {
+        "folder": "inclined_coarse",
+        "multiplier": 1,
+        "cases": {
+          "baseline": {
+            "peak_rms_mm": 23.319387144107445,
+            "peak_rms_time_s": 0.0394004,
+            "first_wall_impulse_bracket_ms": [
+              0.1606073,
+              0.1802449
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 2.925565,
+            "median_native_dt_us": 0.7013257,
+            "energy_indicator": 0.0003821375544769281,
+            "instantaneous_force_residual": 8.059996597851024e-06,
+            "momentum_residual": 2.7009381486726318e-05,
+            "integration_seconds": 28.156659344997024,
+            "native_valid": true
+          },
+          "check_b5_minus": {
+            "peak_rms_mm": 23.465694944670005,
+            "peak_rms_time_s": 0.0396005,
+            "first_wall_impulse_bracket_ms": [
+              0.160608,
+              0.18024569999999998
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 2.919901,
+            "median_native_dt_us": 0.7013290999999999,
+            "energy_indicator": 0.0003763697205986352,
+            "instantaneous_force_residual": 5.477055684876923e-06,
+            "momentum_residual": 3.310607786679707e-05,
+            "integration_seconds": 27.502789524995023,
+            "native_valid": true
+          },
+          "check_b5_plus": {
+            "peak_rms_mm": 23.176842406613087,
+            "peak_rms_time_s": 0.0394002,
+            "first_wall_impulse_bracket_ms": [
+              0.1606066,
+              0.18024410000000002
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 2.930917,
+            "median_native_dt_us": 0.7013224,
+            "energy_indicator": 0.00038490610792049705,
+            "instantaneous_force_residual": 7.1281407388245186e-06,
+            "momentum_residual": 2.523924868520127e-05,
+            "integration_seconds": 27.60738957900321,
+            "native_valid": true
+          }
+        }
+      },
+      {
+        "folder": "inclined_fine",
+        "multiplier": 2,
+        "cases": {
+          "baseline": {
+            "peak_rms_mm": 23.103039289510946,
+            "peak_rms_time_s": 0.0394004,
+            "first_wall_impulse_bracket_ms": [
+              0.1606625,
+              0.1803055
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 2.858517,
+            "median_native_dt_us": 0.7014426,
+            "energy_indicator": 0.00018243493740266933,
+            "instantaneous_force_residual": 1.0759413441258334e-05,
+            "momentum_residual": 7.008883429341857e-05,
+            "integration_seconds": 83.70447961598984,
+            "native_valid": true
+          },
+          "check_b5_minus": {
+            "peak_rms_mm": 23.23497690845784,
+            "peak_rms_time_s": 0.0394004,
+            "first_wall_impulse_bracket_ms": [
+              0.1606625,
+              0.1803055
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 2.853541,
+            "median_native_dt_us": 0.701442,
+            "energy_indicator": 0.00017844885877961976,
+            "instantaneous_force_residual": 1.1449345166365508e-05,
+            "momentum_residual": 7.123869252511456e-05,
+            "integration_seconds": 85.65953101200284,
+            "native_valid": true
+          },
+          "check_b5_plus": {
+            "peak_rms_mm": 22.97337121874209,
+            "peak_rms_time_s": 0.0392005,
+            "first_wall_impulse_bracket_ms": [
+              0.1606625,
+              0.1803055
+            ],
+            "first_field_frame_contact_node_ids": [
+              1
+            ],
+            "final_normal_impulse_ns": 2.863512,
+            "median_native_dt_us": 0.7014424,
+            "energy_indicator": 0.00018698156465890141,
+            "instantaneous_force_residual": 1.0850766985849895e-05,
+            "momentum_residual": 6.177286296539068e-05,
+            "integration_seconds": 73.23750843499147,
+            "native_valid": true
+          }
+        }
+      }
+    ]
+  }
+}

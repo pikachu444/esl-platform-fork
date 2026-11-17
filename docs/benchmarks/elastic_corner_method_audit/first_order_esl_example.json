@@ -1,0 +1,94 @@
+{
+  "source": "https://arxiv.org/abs/2508.07222",
+  "section": "5.1, Table 1 and Figure 3",
+  "runs": [
+    {
+      "time_step": 0.2,
+      "published_step": true,
+      "points": [
+        {
+          "section_areas": [
+            0.1,
+            0.6
+          ],
+          "objective": 0.8488226902097586,
+          "objective_gradient": [
+            1.144917207658002,
+            -1.5087345462740962
+          ],
+          "paper_objective": 0.888,
+          "paper_objective_gradient": [
+            1.26,
+            -1.56
+          ],
+          "direct_vs_dynamic_fd_l2": 2.7540706347842116e-10,
+          "first_order_vs_direct_gradient_l2": 1.8791725697367572e-10,
+          "frozen_vs_direct_gradient_l2": 1.0599368394961282
+        },
+        {
+          "section_areas": [
+            0.85,
+            0.1
+          ],
+          "objective": 6.829226641697176,
+          "objective_gradient": [
+            -1.2750495759824418,
+            -36.71496706101834
+          ],
+          "paper_objective": 7.344,
+          "paper_objective_gradient": [
+            -0.72,
+            -38.86
+          ],
+          "direct_vs_dynamic_fd_l2": 1.0727312397625957e-09,
+          "first_order_vs_direct_gradient_l2": 5.7257630938517456e-11,
+          "frozen_vs_direct_gradient_l2": 0.8098714901620916
+        }
+      ]
+    },
+    {
+      "time_step": 0.02,
+      "published_step": false,
+      "points": [
+        {
+          "section_areas": [
+            0.1,
+            0.6
+          ],
+          "objective": 0.8884161637179099,
+          "objective_gradient": [
+            1.2348708520324996,
+            -1.5592446084190161
+          ],
+          "paper_objective": 0.888,
+          "paper_objective_gradient": [
+            1.26,
+            -1.56
+          ],
+          "direct_vs_dynamic_fd_l2": 2.8324860586056864e-10,
+          "first_order_vs_direct_gradient_l2": 1.8965740129466617e-10,
+          "frozen_vs_direct_gradient_l2": 1.081490074492396
+        },
+        {
+          "section_areas": [
+            0.85,
+            0.1
+          ],
+          "objective": 7.343575385049444,
+          "objective_gradient": [
+            -0.7194934081088452,
+            -38.86015621727889
+          ],
+          "paper_objective": 7.344,
+          "paper_objective_gradient": [
+            -0.72,
+            -38.86
+          ],
+          "direct_vs_dynamic_fd_l2": 1.1121110314242682e-09,
+          "first_order_vs_direct_gradient_l2": 5.768094608686459e-11,
+          "frozen_vs_direct_gradient_l2": 0.8140784872775249
+        }
+      ]
+    }
+  ]
+}

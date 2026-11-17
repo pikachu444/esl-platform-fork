@@ -15,6 +15,7 @@ python -m esl.benchmarks.shape_methods baseline --solver out/solver/OpenCourant 
 python -m esl.benchmarks.shape_methods all --solver out/solver/OpenCourant --out out/elastic-corner
 python -m esl.benchmarks.shape_report out/elastic-corner
 python -m esl.benchmarks.shape_sensitivity --solver out/solver/OpenCourant --out out/sensitivity --jobs 4
+python -m esl.benchmarks.shape_sensitivity --solver out/solver/OpenCourant --out out/sensitivity --jobs 4 --inclination
 python -m esl.benchmarks.first_order_esl_example
 ```
 
