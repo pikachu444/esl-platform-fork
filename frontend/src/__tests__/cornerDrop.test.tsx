@@ -22,6 +22,7 @@ describe("실제 비교 실행 화면 연결", () => {
       return new Response("[]");
     });
     vi.stubGlobal("fetch",fetcher); mount();
+    fireEvent.change(screen.getByLabelText("실행 규모"),{target:{value:"full"}});
     for (const method of methods) {
       const button=await screen.findByRole("button",{name:`${method.code} 실행`});
       await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
@@ -35,7 +36,17 @@ describe("실제 비교 실행 화면 연결", () => {
   it("조회 역할에는 실행 버튼을 비활성화한다", async () => {
     state.allowed=false;
     vi.stubGlobal("fetch",vi.fn(async (url:RequestInfo|URL) => new Response(String(url).endsWith("/settings") ? JSON.stringify({available:true,can_execute:false,methods}) : "[]")));
-    mount();const button=await screen.findByRole("button",{name:"P0 실행"});
+    mount();fireEvent.change(screen.getByLabelText("실행 규모"),{target:{value:"full"}});const button=await screen.findByRole("button",{name:"P0 실행"});
     expect((button as HTMLButtonElement).disabled).toBe(true);
+  });
+  it("새 탄성 방법 버튼은 독립 검증 프리셋으로 실행한다", async () => {
+    const shape_methods=["frozen","balanced","incremental","first_order_load","first_order_balanced","response_taylor"].map(id=>({id,label:id,family:"검증",extra_dynamic_runs:id.includes("first_order")||id==="response_taylor"?12:0}));
+    const fetcher=vi.fn(async (url:RequestInfo|URL,opts?:RequestInit)=>new Response(String(url).endsWith("/settings")?JSON.stringify({available:true,can_execute:true,methods,shape_methods}):opts?.method==="POST"?JSON.stringify({id:"b".repeat(32)}):"[]"));
+    vi.stubGlobal("fetch",fetcher);mount();
+    for(const m of shape_methods){
+      const button=await screen.findByRole("button",{name:`${m.label} 실행`});
+      await waitFor(()=>expect((button as HTMLButtonElement).disabled).toBe(false));fireEvent.click(button);
+      await waitFor(()=>expect(fetcher.mock.calls.some(([,opts])=>opts?.body===JSON.stringify({method:m.id,preset:"shape_corner"}))).toBe(true));
+    }
   });
 });

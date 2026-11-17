@@ -15,8 +15,8 @@ BASE='/projects/{project_id}/corner-drop'
 
 class StartExperiment(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    method: Literal['all','displacement','balanced_displacement','physical_acceleration','contact_inertia_relief','incremental_geometry','ritz_reference']='all'
-    preset: Literal['full','smoke']='full'
+    method: Literal['all','displacement','balanced_displacement','physical_acceleration','contact_inertia_relief','incremental_geometry','ritz_reference','frozen','balanced','incremental','first_order_load','first_order_balanced','response_taylor']='all'
+    preset: Literal['full','smoke','shape_corner','shape_flat']='shape_corner'
 
 
 @router.get(BASE+'/settings')

@@ -20,12 +20,14 @@ import uuid
 import zipfile
 
 from esl.mech.drop_surrogates import METHODS
+from esl.mech.shape_methods import PLANS as SHAPE_METHODS
 from esl.benchmarks.experiment import write_json
 from ...core.errors import DomainError, forbidden, not_found
 from .common import require_config_ok, require_execute
 
 REPO = Path(__file__).resolve().parents[4]
-PRESETS = {'full': 'corner_drop_benchmark.json', 'smoke': 'corner_drop_smoke.json'}
+PRESETS = {'full': 'corner_drop_benchmark.json', 'smoke': 'corner_drop_smoke.json',
+           'shape_corner':'shape_method_validation.json','shape_flat':'shape_method_control_flat.json'}
 TERMINAL = {'completed','failed','canceled','interrupted'}
 
 
@@ -72,7 +74,8 @@ def status_at(path):
     if not alive and progress['status'] not in TERMINAL:
         progress=dict(status='interrupted',stage='stopped',error='작업 프로세스가 종료되었습니다. 로그를 확인하고 다시 실행하세요.')
         write_json(path/'progress.json',progress)
-    result=json.loads((path/'result.json').read_text()) if (path/'result.json').exists() else None
+    result_path=path/('method_results.json' if run.get('preset','').startswith('shape_') else 'result.json')
+    result=json.loads(result_path.read_text()) if result_path.exists() else None
     return dict(**run,progress=progress,result=result,alive=alive)
 
 
@@ -86,7 +89,8 @@ def info(ctx,principal,project_id):
     elif sys.platform!='linux': reason='이 실행기는 Linux/WSL에서 지원합니다. Windows 네이티브는 검증하지 않았습니다.'
     elif not available: reason='서버의 OpenCourant solver_root와 실행 파일을 확인해야 합니다.'
     return dict(available=bool(available),reason=reason,can_execute=principal.can_execute(project_id),
-                methods=[dict(id=k,**asdict(v)) for k,v in METHODS.items()],presets=list(PRESETS),
+                methods=[dict(id=k,**asdict(v)) for k,v in METHODS.items()],
+                shape_methods=[dict(id=k,**asdict(v)) for k,v in SHAPE_METHODS.items()],presets=list(PRESETS),
                 max_runtime_s=cfg.max_runtime_s)
 
 
@@ -100,8 +104,9 @@ def start(ctx,principal,project_id,method,preset):
     check_view(principal,project_id); require_config_ok(ctx); require_execute(principal,project_id)
     state=info(ctx,principal,project_id)
     if not state['available']: raise DomainError('CORNER_DROP_UNAVAILABLE',state['reason'],status=503)
-    if method!='all' and method not in METHODS: raise DomainError('INVALID_PARAMS','지원하지 않는 방법입니다',status=422)
     if preset not in PRESETS: raise DomainError('INVALID_PARAMS','지원하지 않는 프리셋입니다',status=422)
+    method_table=SHAPE_METHODS if preset.startswith('shape_') else METHODS
+    if method!='all' and method not in method_table: raise DomainError('INVALID_PARAMS','이 프리셋에서 지원하지 않는 방법입니다',status=422)
     import fcntl
     folder=root(ctx);folder.mkdir(parents=True,exist_ok=True)
     lock=os.open(folder/'runner.lock',os.O_CREAT|os.O_RDWR,0o600)
@@ -113,6 +118,7 @@ def start(ctx,principal,project_id,method,preset):
         command=[sys.executable,'-m','esl.benchmarks.service_worker','--lock-fd',str(lock),
                  '--timeout',str(cfg.max_runtime_s),'--out',str(path),'--solver',cfg.solver_root,
                  '--config',str(REPO/'config'/PRESETS[preset])]
+        if preset.startswith('shape_'):command+=['--study','shape']
         if method!='all':command+=['--method',method]
         env=os.environ.copy()
         env['PYTHONPATH']=os.pathsep.join([str(REPO),str(REPO/'packages/beadgraph/src'),env.get('PYTHONPATH','')])
@@ -146,7 +152,7 @@ def cancel(ctx,principal,project_id,rid):
 
 def artifact(ctx,principal,project_id,rid,name):
     path=run_path(ctx,principal,project_id,rid)
-    names={'comparison.csv','result.json','report.html','report.md','benchmark.png','sensitivity.png','drop_comparison.gif','worker.log','bundle.zip'}
+    names={'comparison.csv','result.json','method_results.json','report.html','report.md','benchmark.png','sensitivity.png','contours.png','drop_comparison.gif','worker.log','bundle.zip'}
     if name not in names:raise not_found()
     state=status_at(path)
     if name=='bundle.zip':

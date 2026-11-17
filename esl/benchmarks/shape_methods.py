@@ -65,7 +65,12 @@ def run_dynamic(out,solver,cfg,case,multiplier=1):
         old=read(marker)
         if old['signature']!=signature:raise ValueError('incompatible cached run: '+label)
         return read(path/'metrics.json')
-    if path.exists() and any(path.iterdir()):raise ValueError('unfinished existing native run: '+label)
+    if path.exists() and any(path.iterdir()):
+        # Keep interrupted native output intact, then start in a fresh run directory.
+        # The study-level flock prevents a second active worker in this output root.
+        archive=out/'interrupted'/f'{time.time_ns()}_{label}'
+        archive.parent.mkdir(parents=True,exist_ok=True);path.rename(archive)
+        print(json.dumps(dict(stage='preserved_interrupted_attempt',case=label,archive=str(archive))),flush=True)
     mesh=make_mesh(cfg,case['depths_mm'],multiplier)
     write(out/'progress.json',dict(status='running',stage='dynamic',case=label,updated_at=time.time()))
     print(json.dumps(dict(stage='dynamic',case=label)),flush=True);start=time.monotonic()
@@ -92,11 +97,18 @@ def main():
     ap.add_argument('--method',action='append');ap.add_argument('--case',action='append')
     args=ap.parse_args();cfg=read(args.config);out=args.out.resolve();solver=args.solver.resolve();out.mkdir(parents=True,exist_ok=True)
     manifest=dict(config=cfg,solver=executable_provenance(solver),study='fixed geometry method selection')
+    import fcntl
+    execution_lock=(out/'.study.lock').open('a')
+    try:fcntl.flock(execution_lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except BlockingIOError:raise ValueError('another study process is active in this output folder')
     if (out/'manifest.json').exists() and read(out/'manifest.json')!=manifest:raise ValueError('incompatible manifest')
     write(out/'manifest.json',manifest)
     if args.stage in ['baseline','dynamic','all']:
+        gradient_methods={'first_order_load','first_order_balanced','response_taylor'}
+        needs_gradient=bool(gradient_methods.intersection(args.method or cfg['study']['methods']))
         cases=[c for c in cfg['cases'] if (args.stage!='baseline' or c['role']=='baseline') and
-               (not args.case or c['id'] in args.case)]
+               (not args.case or c['id'] in args.case) and
+               (needs_gradient or c['role'] not in ['calibration','sensitivity_check'])]
         for case in cases:run_dynamic(out,solver,cfg,case)
         if args.stage in ['dynamic','all'] and not args.case:
             for ident in cfg['mesh_check_cases']:

@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--solver', required=True)
     parser.add_argument('--config', required=True)
     parser.add_argument('--method', action='append', default=[])
+    parser.add_argument('--study',choices=['legacy','shape'],default='legacy')
     args = parser.parse_args()
     out = Path(args.out); canceled = False
 
@@ -37,10 +38,16 @@ def main():
     for method in args.method: command.extend(['--method', method])
     exit_code = 0
     try:
-        from .corner_drop import main as run
+        if args.study=='shape':
+            from .shape_methods import main as run
+        else:
+            from .corner_drop import main as run
         sys.argv = command
         run()
-        from .report import generate_report
+        if args.study=='shape':
+            from .shape_report import generate_report
+        else:
+            from .report import generate_report
         generate_report(out)
     except Exception as exc:
         exit_code = 1

@@ -23,7 +23,8 @@ def evaluate(out,cfg,methods=None):
     baseline=read(basepath/'metrics.json');roles={x['id']:x for x in cfg['cases']}
     supports={k:[(int(n)-1,d) for n,d in v] for k,v in cfg['study']['static_gauge'].items()}
     calibration=[]
-    for j in range(6):
+    needs_gradient=bool({'first_order_load','first_order_balanced','response_taylor'}.intersection(methods))
+    for j in range(6 if needs_gradient else 0):
         minus=out/'runs'/f'cal_b{j+1}_minus';plus=out/'runs'/f'cal_b{j+1}_plus'
         calibration.append((load(minus/'input_mesh.npz'),resample(load(minus/'history.npz'),tm),
                             load(plus/'input_mesh.npz'),resample(load(plus/'history.npz'),tm)))
@@ -31,12 +32,13 @@ def evaluate(out,cfg,methods=None):
     write(out/'method_definitions.json',{k:asdict(v) for k,v in PLANS.items()})
     write(out/'evaluation_times.json',dict(times_s=tm.tolist(),resampling='linear to common physical times',
         source_frames=len(hist['time']),fields='rigid-removed displacement',static_gauge=cfg['study']['static_gauge']))
-    calibration_cost=sum(read(out/'runs'/c['id']/'metrics.json')['elapsed_s'] for c in cfg['cases'] if c['role']=='calibration')
+    calibration_cost=sum(read(out/'runs'/c['id']/'metrics.json')['elapsed_s'] for c in cfg['cases'] if c['role']=='calibration') if needs_gradient else 0.
     results=dict(scope='fixed bead shape perturbation method selection; elastic material',
         methods=methods,field_thresholds=cfg['study']['thresholds'],calibration_dynamic_s=calibration_cost,
         baseline_dynamic_s=baseline['elapsed_s'],baseline={},cases=[],mesh_checks={},
         preparation=dict(base_s=ref.base_preparation_s,first_order_s=ref.gradient_preparation_s))
     for case in [x for x in cfg['cases'] if x['role'] in ['baseline','validation','sensitivity_check']]:
+        if case['role']=='sensitivity_check' and not needs_gradient:continue
         label=case['id'];path=out/'runs'/label;cm=load(path/'input_mesh.npz');ch=load(path/'history.npz')
         measured=project_fields(cm['x0'],resample(ch,tm));delta=np.array(case['depths_mm'])-mesh['depths']
         mass=nodal_mass(cm,cfg['material']['density_tonne_mm3'])
@@ -65,11 +67,12 @@ def evaluate(out,cfg,methods=None):
         results['preparation']['incremental_s']=ref.increment_preparation_s
         write(out/'method_results.json',results)
     # Independent finite-difference step check for bead 5. These runs were never calibration input.
-    lo=resample(load(out/'runs/check_b5_minus/history.npz'),tm)
-    hi=resample(load(out/'runs/check_b5_plus/history.npz'),tm)
-    fine_g=(hi-lo)/.05
-    results['fd_step_check']=dict(bead=5,calibration_h_mm=.05,check_h_mm=.025,
-        response_gradient_relative_difference=relative_error(ref.gradient_u[4],fine_g))
+    if needs_gradient:
+        lo=resample(load(out/'runs/check_b5_minus/history.npz'),tm)
+        hi=resample(load(out/'runs/check_b5_plus/history.npz'),tm)
+        fine_g=(hi-lo)/.05
+        results['fd_step_check']=dict(bead=5,calibration_h_mm=.05,check_h_mm=.025,
+            response_gradient_relative_difference=relative_error(ref.gradient_u[4],fine_g))
     for name in cfg['mesh_check_cases']:
         coarse=read(out/'runs'/name/'metrics.json');fine=read(out/'runs'/(name+'_fine')/'metrics.json')
         results['mesh_checks'][name]=dict(coarse_rms_mm=coarse['peak_rms_mm'],fine_rms_mm=fine['peak_rms_mm'],

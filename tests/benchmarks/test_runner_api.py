@@ -61,3 +61,18 @@ def test_default_values_mirror_config_examples():
     for filename in ['esl_platform.example.yaml','esl_platform.prod.example.yaml']:
         data=yaml.safe_load(Path('config',filename).read_text())
         assert data['bead_doe']['corner_drop']==defaults
+
+
+def test_shape_presets_reject_legacy_methods_and_report_shape_results(tmp_path,monkeypatch):
+    ctx=context(tmp_path)
+    monkeypatch.setattr(svc,'info',lambda *args:dict(available=True))
+    with pytest.raises(DomainError) as e:svc.start(ctx,principal(),'p1','displacement','shape_corner')
+    assert e.value.status==422
+    with pytest.raises(DomainError) as e:svc.start(ctx,principal(),'p1','first_order_load','full')
+    assert e.value.status==422
+    path=svc.project_root(ctx,'p1')/('b'*32);path.mkdir(parents=True)
+    (path/'run.json').write_text(json.dumps(dict(id='b'*32,pid=99999999,start_identity='123',preset='shape_corner')))
+    (path/'progress.json').write_text(json.dumps(dict(status='completed')))
+    expected=dict(scope='elastic shape validation',summary={})
+    (path/'method_results.json').write_text(json.dumps(expected))
+    assert svc.get(ctx,principal(),'p1','b'*32)['result']==expected
