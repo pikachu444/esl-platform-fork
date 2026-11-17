@@ -56,10 +56,20 @@ def nodal_normals(x, conn):
 
 
 def impact_coordinates(mesh, drop):
-    a, b = np.deg2rad([drop['rx_deg'], drop['ry_deg']])
-    rx = np.array([[1, 0, 0], [0, np.cos(a), -np.sin(a)], [0, np.sin(a), np.cos(a)]])
-    ry = np.array([[np.cos(b), 0, np.sin(b)], [0, 1, 0], [-np.sin(b), 0, np.cos(b)]])
-    R = ry@rx
+    if drop.get('orientation') == 'corner_diagonal':
+        # Rotate the initial plate's in-plane corner-to-center diagonal toward +Z.
+        # At 90 degrees the center-to-corner diagonal is vertical, with node 1 lowest.
+        span=np.ptp(mesh['x0'][:,:2],axis=0)
+        direction=np.r_[span,0.]/np.linalg.norm(span)
+        axis=np.cross(direction,[0.,0.,1.]);axis/=np.linalg.norm(axis)
+        angle=np.deg2rad(drop['panel_tilt_deg'])
+        x,y,z=axis;S=np.array([[0.,-z,y],[z,0.,-x],[-y,x,0.]])
+        R=np.eye(3)+np.sin(angle)*S+(1-np.cos(angle))*(S@S)
+    else:
+        a, b = np.deg2rad([drop['rx_deg'], drop['ry_deg']])
+        rx = np.array([[1, 0, 0], [0, np.cos(a), -np.sin(a)], [0, np.sin(a), np.cos(a)]])
+        ry = np.array([[np.cos(b), 0, np.sin(b)], [0, 1, 0], [-np.sin(b), 0, np.cos(b)]])
+        R = ry@rx
     X = mesh['x0']@R.T
     X[:, 2] += drop['clearance_mm'] + .5*float(mesh['thickness'][0])-X[:, 2].min()
     return X, R

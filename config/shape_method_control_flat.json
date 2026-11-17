@@ -1,0 +1,438 @@
+{
+  "schema": "esl/shape-method-validation/1",
+  "seed": 20261117,
+  "solver": {
+    "tag": "latest-20261011",
+    "linux_url": "https://github.com/OpenCourant/OpenCourant/releases/download/latest-20261011/OpenCourant_linux64.zip",
+    "linux_sha256": "6cb419677ca36d73acb96218cc0cf5e4f7d50494d9c7812ba27935e3c0f8ec94",
+    "threads": 2,
+    "timeout_s": 600,
+    "time_step_scale": 0.45
+  },
+  "plate": {
+    "length_mm": 800.0,
+    "width_mm": 450.0,
+    "thickness_mm": 0.8,
+    "nx": 40,
+    "ny": 24
+  },
+  "material": {
+    "E_MPa": 210000.0,
+    "nu": 0.3,
+    "density_tonne_mm3": 7.85e-09,
+    "law": "ELAST"
+  },
+  "drop": {
+    "height_mm": 600.0,
+    "gravity_mm_s2": 9810.0,
+    "rx_deg": 3.0,
+    "ry_deg": -4.0,
+    "clearance_mm": 0.6,
+    "friction": 0.15,
+    "end_time_s": 0.04,
+    "frame_dt_s": 0.0002
+  },
+  "beads": {
+    "count": 6,
+    "baseline_depth_mm": 2.0,
+    "min_depth_mm": 0.0,
+    "max_depth_mm": 8.0,
+    "opening_width_mm": 80.0,
+    "edge_taper_mm": 40.0,
+    "max_height_mm": 16.0,
+    "max_slope_deg": 35.0,
+    "max_mass_ratio": 1.02
+  },
+  "methods": [
+    "displacement",
+    "balanced_displacement",
+    "physical_acceleration",
+    "contact_inertia_relief",
+    "incremental_geometry",
+    "ritz_reference"
+  ],
+  "study": {
+    "purpose": "method selection for fixed bead shape perturbations, no optimization",
+    "fd_step_mm": 0.05,
+    "load_intervals": 40,
+    "incremental_intervals": 12,
+    "methods": [
+      "frozen",
+      "balanced",
+      "incremental",
+      "first_order_load",
+      "first_order_balanced",
+      "response_taylor"
+    ],
+    "static_gauge": {
+      "primary": [
+        [
+          1025,
+          "123"
+        ],
+        [
+          1001,
+          "13"
+        ],
+        [
+          25,
+          "3"
+        ]
+      ],
+      "alternate": [
+        [
+          1,
+          "123"
+        ],
+        [
+          1001,
+          "23"
+        ],
+        [
+          25,
+          "3"
+        ]
+      ]
+    },
+    "thresholds": {
+      "field_relative_l2": 0.15,
+      "peak_rms_relative_error": 0.1,
+      "roundtrip_relative_l2": 0.0001,
+      "gauge_relative_l2": 0.0001,
+      "direction_agreement": 0.8
+    },
+    "small_region_max_change_mm": 0.1,
+    "max_duration_s": 0.04,
+    "seed": 20261118
+  },
+  "cases": [
+    {
+      "id": "baseline",
+      "role": "baseline",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b1_minus",
+      "role": "calibration",
+      "depths_mm": [
+        1.95,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b1_plus",
+      "role": "calibration",
+      "depths_mm": [
+        2.05,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b2_minus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        1.95,
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b2_plus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.05,
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b3_minus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.0,
+        1.95,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b3_plus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.05,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b4_minus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        1.95,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b4_plus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.05,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b5_minus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        1.95,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b5_plus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.05,
+        2.0
+      ]
+    },
+    {
+      "id": "cal_b6_minus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        1.95
+      ]
+    },
+    {
+      "id": "cal_b6_plus",
+      "role": "calibration",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.05
+      ]
+    },
+    {
+      "id": "check_b5_minus",
+      "role": "sensitivity_check",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        1.975,
+        2.0
+      ]
+    },
+    {
+      "id": "check_b5_plus",
+      "role": "sensitivity_check",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.025,
+        2.0
+      ]
+    },
+    {
+      "id": "test_b1_010",
+      "role": "validation",
+      "depths_mm": [
+        2.1,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "test_b2_010",
+      "role": "validation",
+      "depths_mm": [
+        2.0,
+        1.9,
+        2.0,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "test_b3_010",
+      "role": "validation",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.1,
+        2.0,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "test_b4_010",
+      "role": "validation",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        1.9,
+        2.0,
+        2.0
+      ]
+    },
+    {
+      "id": "test_b5_010",
+      "role": "validation",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.1,
+        2.0
+      ]
+    },
+    {
+      "id": "test_b6_010",
+      "role": "validation",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        1.9
+      ]
+    },
+    {
+      "id": "test_b5_minus_050",
+      "role": "validation",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        1.5,
+        2.0
+      ]
+    },
+    {
+      "id": "test_b5_plus_050",
+      "role": "validation",
+      "depths_mm": [
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        2.5,
+        2.0
+      ]
+    },
+    {
+      "id": "test_mixed_010",
+      "role": "validation",
+      "depths_mm": [
+        2.1,
+        1.9,
+        2.1,
+        1.9,
+        2.1,
+        1.9
+      ]
+    },
+    {
+      "id": "test_mixed_reverse_010",
+      "role": "validation",
+      "depths_mm": [
+        1.9,
+        2.1,
+        1.9,
+        2.1,
+        1.9,
+        2.1
+      ]
+    },
+    {
+      "id": "test_mixed_050",
+      "role": "validation",
+      "depths_mm": [
+        2.5,
+        1.5,
+        2.5,
+        1.5,
+        2.5,
+        1.5
+      ]
+    },
+    {
+      "id": "test_mixed_0025",
+      "role": "validation",
+      "depths_mm": [
+        2.025,
+        1.975,
+        2.025,
+        1.975,
+        2.025,
+        1.975
+      ]
+    }
+  ],
+  "mesh_check_cases": [
+    "baseline",
+    "test_mixed_010"
+  ]
+}

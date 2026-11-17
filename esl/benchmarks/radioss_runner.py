@@ -26,13 +26,17 @@ def write_deck(path, mesh, cfg):
     m, d = cfg['material'], cfg['drop']
     X, R = impact_coordinates(mesh, d)
     speed = np.sqrt(2*d['gravity_mm_s2']*d['height_mm'])
+    if m.get('law', 'PLAS_JOHNS') == 'ELAST':
+        material = ['/MAT/ELAST/1', 'linear elastic benchmark material',
+                    reals(m['density_tonne_mm3']), reals(m['E_MPa'], m['nu'])]
+    else:
+        material = ['/MAT/PLAS_JOHNS/1', 'benchmark steel', reals(m['density_tonne_mm3']),
+                    reals(m['E_MPa'], m['nu'])+ints(0, 0),
+                    reals(m['yield_MPa'], m['hardening_MPa'], m['hardening_exponent'], 0, 0),
+                    reals(0, 1)+ints(0, 0)+reals(0, 0), reals(0, 0, 0, 0)]
     s = ['#RADIOSS STARTER', '/BEGIN', 'corner', ints(2022, 0),
          '                  Mg                  mm                   s',
-         '                  Mg                  mm                   s',
-         '/MAT/PLAS_JOHNS/1', 'benchmark steel', reals(m['density_tonne_mm3']),
-         reals(m['E_MPa'], m['nu'])+ints(0, 0),
-         reals(m['yield_MPa'], m['hardening_MPa'], m['hardening_exponent'], 0, 0),
-         reals(0, 1)+ints(0, 0)+reals(0, 0), reals(0, 0, 0, 0),
+         '                  Mg                  mm                   s'] + material + [
          '/PROP/SHELL/1', 'QEPH five through-thickness points', ints(24, 0, 0, 0),
          reals(0, 0, 0, 0, 0), ints(5, 0)+reals(mesh['thickness'][0], 0)+' '*10+ints(1, 1),
          '/PART/1', 'wide beaded panel', ints(1, 1, 0), '/NODE']
@@ -56,6 +60,8 @@ def write_deck(path, mesh, cfg):
            '/ANIM/VECT/FINT', '/ANIM/ELEM/EPSP', '/ANIM/SHELL/EPSP/ALL', '/ANIM/ELEM/VONM', '/ANIM/ELEM/ENER',
            '/ANIM/ELEM/HOURG', '/ANIM/SHELL/TENS/STRAIN/UPPER', '/ANIM/SHELL/TENS/STRAIN/LOWER',
            '/ANIM/SHELL/TENS/STRESS/UPPER', '/ANIM/SHELL/TENS/STRESS/LOWER', '/END']
+    if m.get('law') == 'ELAST':
+        eng = [line for line in eng if '/EPSP' not in line]
     (path/'corner_0001.rad').write_text('\n'.join(eng)+'\n', encoding='ascii')
     np.savez_compressed(path/'input_mesh.npz', **mesh, world_initial=X, initial_rotation=R)
     (path/'input_config.json').write_text(json.dumps(cfg, indent=2)+'\n')
