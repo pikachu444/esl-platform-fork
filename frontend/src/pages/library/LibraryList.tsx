@@ -614,6 +614,7 @@ export function LibraryList() {
     <Shell crumbs={[{ label: project?.name ?? projectId, to: `/p/${projectId}` }, { label: MENU_LIBRARY, to: `/p/${projectId}/library` }, { label: tabLabel }]} projectId={projectId}>
       <div className="page-title-row">
         <h1 className="page-title">{MENU_LIBRARY}</h1>
+        <Link className="btn" to={`/p/${projectId}/benchmarks/corner-drop`}>코너 낙하 방법 비교</Link>
         <span className="muted small">검증 PASS 한 ESL 하중을 모아 내보내기·강성 평가·비드 최적화·종합분석에 씁니다</span>
       </div>
       <div className="tabs" role="tablist" aria-label="라이브러리 탭">

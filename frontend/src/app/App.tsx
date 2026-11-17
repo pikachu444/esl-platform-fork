@@ -18,6 +18,7 @@ import { ProjectHistory } from "../pages/history/ProjectHistory";
 import { JobReview } from "../pages/history/JobReview";
 import { OptNew } from "../pages/opt/OptNew";
 import { OptDetail } from "../pages/opt/OptDetail";
+import { CornerDrop } from "../pages/benchmarks/CornerDrop";
 import { DoeStudy } from "../pages/doe/DoeStudy";
 import { stepOfStage } from "../shell/StageStepper";
 
@@ -64,6 +65,7 @@ export function App() {
         <Route path="/p/:projectId/history" element={<ProjectHistory />} />
         <Route path="/p/:projectId/jobs/:jobId" element={<JobReview />} />
         <Route path="/p/:projectId/c/:caseId" element={<Navigate to="step/1" replace />} />
+        <Route path="/p/:projectId/benchmarks/corner-drop" element={<CornerDrop />} />
         <Route path="/p/:projectId/library" element={<LibraryRoute />} />
         <Route path="/p/:projectId/library/analyses/new" element={<AnalysisNew />} />
         <Route path="/p/:projectId/library/analyses/:analysisId" element={<AnalysisDetail />} />

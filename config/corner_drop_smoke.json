@@ -1,0 +1,6 @@
+{
+  "extends": "corner_drop_benchmark.json",
+  "plate": {"nx": 20, "ny": 12},
+  "drop": {"end_time_s": 0.006, "frame_dt_s": 0.0001},
+  "sampling": {"sobol_power": 3, "holdout_count": 2, "refinement_evaluations": 0, "incremental_intervals": 6}
+}

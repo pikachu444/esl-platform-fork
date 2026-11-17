@@ -7,6 +7,7 @@ dependencies = ["numpy", "scipy", "pyyaml", "beadgraph==1.1.0"]
 
 [project.optional-dependencies]
 test = ["pytest"]
+benchmark = ["matplotlib>=3.7", "pillow>=10"]
 # 대규모 쉘 솔버 (esl_core §7.5). backend="auto" 우선순위: cholmod → pardiso → superlu,
 # 직접법 메모리 부족 예상 시 반복법(CG + pyamg). scikit-sparse 는 libsuitesparse(-dev) 필요(Windows 휠 없음).
 fast = [

@@ -1346,7 +1346,18 @@ class BeadDoeSelectCfg(_M):
     derive_timeout_s: float = Field(default=20, gt=0, le=600)
 
 
+class CornerDropCfg(_M):
+    """Linux/WSL experimental runner; independent of the existing DOE execution path."""
+
+    enabled: bool = False
+    solver_root: str | None = None
+    max_runtime_s: int = Field(default=10800, ge=60, le=86400)
+    max_listed_runs: int = Field(default=50, ge=1, le=500)
+    download_max_mb: int = Field(default=4096, ge=1, le=16384)
+
+
 class BeadDoeCfg(_M):
+    corner_drop: CornerDropCfg = CornerDropCfg()
     """비드 형상 DOE(esl_bead_doe.md §14). 섹션이 없으면 enabled false(GET /doe/settings reason DOE_DISABLED)."""
 
     enabled: bool = False

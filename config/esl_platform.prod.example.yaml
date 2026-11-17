@@ -153,6 +153,12 @@ opt_run:                              # v0.7.0 비드 최적화 서버 실행(�
   grid: {nx: 24, ny: 14}
   ui: {max_preview_points: 20000}     # 평면도(plan-view) 요소 점 최대 수
 bead_doe:                             # v0.9.0 비드 형상 DOE(계약 esl_bead_doe.md §14). 섹션이 없으면 enabled: false
+  corner_drop:                       # 독립 공개 판재 실험. Linux/WSL에서만 실제 검증
+    enabled: false
+    solver_root: null                 # OpenCourant 압축 해제 루트. 사용자 요청에서 경로를 받지 않음
+    max_runtime_s: 10800
+    max_listed_runs: 50
+    download_max_mb: 4096
   enabled: true                       # 실행에는 paicad(≥ min_version, OCP 포함)가 필요 — 워커가 점검해 기록(없으면 화면 비활성)
   part_title: "chassis rear"          # ② B 메시 기본 파트 제목(case.part_title 과 같은 규칙)
   max_entries: 50

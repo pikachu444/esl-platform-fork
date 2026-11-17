@@ -48,6 +48,8 @@ DESIGN_STATES = (READY, RUNNING, OK) + SKIPPED + FAILED + (CANCELED,)
 
 # 계약 §14 bead_doe 기본값(설정 파일 우선). 값 변경은 설정 파일에서.
 DEFAULTS: dict = {
+    "corner_drop": {"enabled": False, "solver_root": None, "max_runtime_s": 10800,
+                    "max_listed_runs": 50, "download_max_mb": 4096},
     "enabled": False,                       # 섹션 없으면 enabled: false
     "part_title": "chassis rear",
     "max_entries": 50,
