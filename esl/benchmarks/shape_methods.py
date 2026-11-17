@@ -6,6 +6,7 @@ import hashlib,json,os,re,subprocess,time
 from pathlib import Path
 import numpy as np
 from esl.mech.kabsch import remove_rigid
+from esl.mech.shape_methods import PLANS
 from .corner_model import make_mesh,nodal_mass
 from .radioss_runner import write_deck,run_solver,executable_provenance
 from .fields import read_vtk,history_csv,quality_metrics
@@ -57,7 +58,7 @@ def dynamic_metrics(arrays,gh,cfg):
         energy_balance_fraction=float(np.abs(residual).max()/gh['KINETIC ENERGY'][0]),
         added_mass_fraction=float(gh['ADDED MASS'].max()/gh['MASS'][0]),quality=quality)
 
-def run_dynamic(out,solver,cfg,case,multiplier=1):
+def run_dynamic(out,solver,cfg,case,multiplier=1, *, record_progress=True):
     label=case['id'] if multiplier==1 else case['id']+'_fine'
     path=out/'runs'/label;signature=dict(config=cfg,case=case,multiplier=multiplier,schema=1)
     marker=path/'complete.json'
@@ -72,7 +73,8 @@ def run_dynamic(out,solver,cfg,case,multiplier=1):
         archive.parent.mkdir(parents=True,exist_ok=True);path.rename(archive)
         print(json.dumps(dict(stage='preserved_interrupted_attempt',case=label,archive=str(archive))),flush=True)
     mesh=make_mesh(cfg,case['depths_mm'],multiplier)
-    write(out/'progress.json',dict(status='running',stage='dynamic',case=label,updated_at=time.time()))
+    if record_progress:
+        write(out/'progress.json',dict(status='running',stage='dynamic',case=label,updated_at=time.time()))
     print(json.dumps(dict(stage='dynamic',case=label)),flush=True);start=time.monotonic()
     write_deck(path,mesh,cfg);execution=run_solver(path,solver,cfg)
     if 'NORMAL TERMINATION' not in (path/'engine.log').read_text():raise ValueError('abnormal native termination')
@@ -94,7 +96,7 @@ def main():
     ap.add_argument('stage',choices=['baseline','dynamic','evaluate','all'])
     ap.add_argument('--config',type=Path,default=Path(__file__).resolve().parents[2]/'config/shape_method_validation.json')
     ap.add_argument('--solver',type=Path,required=True);ap.add_argument('--out',type=Path,required=True)
-    ap.add_argument('--method',action='append');ap.add_argument('--case',action='append')
+    ap.add_argument('--method', action='append', choices=PLANS);ap.add_argument('--case',action='append')
     args=ap.parse_args();cfg=read(args.config);out=args.out.resolve();solver=args.solver.resolve();out.mkdir(parents=True,exist_ok=True)
     manifest=dict(config=cfg,solver=executable_provenance(solver),study='fixed geometry method selection')
     import fcntl
@@ -104,8 +106,7 @@ def main():
     if (out/'manifest.json').exists() and read(out/'manifest.json')!=manifest:raise ValueError('incompatible manifest')
     write(out/'manifest.json',manifest)
     if args.stage in ['baseline','dynamic','all']:
-        gradient_methods={'first_order_load','first_order_balanced','response_taylor'}
-        needs_gradient=bool(gradient_methods.intersection(args.method or cfg['study']['methods']))
+        needs_gradient = any(PLANS[name].extra_dynamic_runs for name in args.method or cfg['study']['methods'])
         cases=[c for c in cfg['cases'] if (args.stage!='baseline' or c['role']=='baseline') and
                (not args.case or c['id'] in args.case) and
                (needs_gradient or c['role'] not in ['calibration','sensitivity_check'])]

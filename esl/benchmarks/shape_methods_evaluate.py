@@ -23,12 +23,13 @@ def evaluate(out,cfg,methods=None):
     baseline=read(basepath/'metrics.json');roles={x['id']:x for x in cfg['cases']}
     supports={k:[(int(n)-1,d) for n,d in v] for k,v in cfg['study']['static_gauge'].items()}
     calibration=[]
-    needs_gradient=bool({'first_order_load','first_order_balanced','response_taylor'}.intersection(methods))
+    needs_gradient = any(PLANS[name].extra_dynamic_runs for name in methods)
     for j in range(6 if needs_gradient else 0):
         minus=out/'runs'/f'cal_b{j+1}_minus';plus=out/'runs'/f'cal_b{j+1}_plus'
         calibration.append((load(minus/'input_mesh.npz'),resample(load(minus/'history.npz'),tm),
                             load(plus/'input_mesh.npz'),resample(load(plus/'history.npz'),tm)))
-    ref=Reference(mesh,u0,calibration,cfg['study']['fd_step_mm'],supports)
+    ref=Reference(mesh,u0,calibration,cfg['study']['fd_step_mm'],supports,
+                  basis_energy_fraction=cfg['study'].get('basis_energy_fraction', 0.999))
     write(out/'method_definitions.json',{k:asdict(v) for k,v in PLANS.items()})
     write(out/'evaluation_times.json',dict(times_s=tm.tolist(),resampling='linear to common physical times',
         source_frames=len(hist['time']),fields='rigid-removed displacement',static_gauge=cfg['study']['static_gauge']))
@@ -41,6 +42,10 @@ def evaluate(out,cfg,methods=None):
         if case['role']=='sensitivity_check' and not needs_gradient:continue
         label=case['id'];path=out/'runs'/label;cm=load(path/'input_mesh.npz');ch=load(path/'history.npz')
         measured=project_fields(cm['x0'],resample(ch,tm));delta=np.array(case['depths_mm'])-mesh['depths']
+        reference_field = project_fields(cm['x0'], u0)
+        change = measured - reference_field
+        has_change = np.linalg.norm(change) > 1e-12 * np.linalg.norm(reference_field)
+        reference_peak = float(rms(reference_field).max())
         mass=nodal_mass(cm,cfg['material']['density_tonne_mm3'])
         write(out/'progress.json',dict(status='running',stage='method_evaluation',case=label,updated_at=time.time()))
         print('EVALUATING '+label,flush=True)
@@ -51,11 +56,12 @@ def evaluate(out,cfg,methods=None):
             r=rec[name];pred_rms=rms(pred);field_error=relative_error(pred,measured)
             pe=abs(float(pred_rms.max())-true_peak)/max(true_peak,1e-15)
             r.update(field_relative_l2=field_error,peak_rms_relative_error=pe,
+                change_field_relative_l2=relative_error(pred-reference_field, change) if has_change else None,
                 predicted_peak_rms_mm=float(pred_rms.max()),actual_common_peak_rms_mm=true_peak,
                 actual_dense_peak_rms_mm=metrics['peak_rms_mm'],
                 dense_time_sampling_error=abs(metrics['peak_rms_mm']-true_peak)/metrics['peak_rms_mm'],
-                predicted_delta_rms_mm=float(pred_rms.max()-rms(u0).max()),
-                actual_delta_rms_mm=float(true_peak-rms(u0).max()),
+                predicted_delta_rms_mm=float(pred_rms.max()-reference_peak),
+                actual_delta_rms_mm=float(true_peak-reference_peak),
                 vector_mac=float(np.sum(pred*measured)**2/max(np.sum(pred*pred)*np.sum(measured*measured),1e-30)))
             th=cfg['study']['thresholds']
             r['passes_case']=bool(field_error<=th['field_relative_l2'] and pe<=th['peak_rms_relative_error'] and
@@ -65,6 +71,7 @@ def evaluate(out,cfg,methods=None):
         else:results['cases'].append(dict(id=label,role=case['role'],delta_mm=delta.tolist(),
             max_change_mm=float(np.abs(delta).max()),native_valid=metrics['native_valid'],methods=rec))
         results['preparation']['incremental_s']=ref.increment_preparation_s
+        results['preparation']['snapshot_s'] = ref.snapshot_preparation_s
         write(out/'method_results.json',results)
     # Independent finite-difference step check for bead 5. These runs were never calibration input.
     if needs_gradient:
@@ -89,14 +96,17 @@ def evaluate(out,cfg,methods=None):
             agreement=signs/len(meaningful) if meaningful else None
             regions[region]=dict(tests=len(rows),completed=len(good),passed=sum(x.get('passes_case',False) for x in rows),
                 worst_field_l2=max((x['field_relative_l2'] for x in good),default=None),
+                worst_change_field_l2=max((x['change_field_relative_l2'] for x in good
+                                           if x['change_field_relative_l2'] is not None), default=None),
                 worst_peak_rms_error=max((x['peak_rms_relative_error'] for x in good),default=None),
                 worst_gauge_error=max((x['gauge_relative_l2'] for x in good),default=None),
                 direction_agreement=agreement,direction_tests=len(meaningful),
-                recommended_in_region=bool(len(good)==len(rows) and all(x['passes_case'] for x in rows) and
+                recommended_in_region=bool(not PLANS[name].control and len(good)==len(rows) and
+                    all(x['passes_case'] for x in rows) and
                     agreement is not None and agreement>=cfg['study']['thresholds']['direction_agreement'] and
-                    results['baseline'][name]['field_relative_l2']<=cfg['study']['thresholds']['roundtrip_relative_l2']),
+                    results['baseline'][name].get('field_relative_l2', np.inf)<=cfg['study']['thresholds']['roundtrip_relative_l2']),
                 median_prediction_s=float(np.median([x['elapsed_s'] for x in good])) if good else None)
-        summaries[name]=dict(label=PLANS[name].label,family=PLANS[name].family,regions=regions,
+        summaries[name]=dict(label=PLANS[name].label,family=PLANS[name].family,regions=regions, control=PLANS[name].control,
             extra_calibration_drops=PLANS[name].extra_dynamic_runs)
     results['summary']=summaries;results['elapsed_evaluation_s']=time.monotonic()-start
     write(out/'method_results.json',results)

@@ -54,15 +54,19 @@
   "study": {
     "purpose": "method selection for fixed bead shape perturbations, no optimization",
     "fd_step_mm": 0.05,
+    "basis_energy_fraction": 0.999,
     "load_intervals": 40,
     "incremental_intervals": 12,
     "methods": [
       "frozen",
       "balanced",
       "incremental",
+      "incremental_balanced",
       "first_order_load",
       "first_order_balanced",
-      "response_taylor"
+      "response_taylor",
+      "snapshot_esl",
+      "reference_replay"
     ],
     "static_gauge": {
       "primary": [

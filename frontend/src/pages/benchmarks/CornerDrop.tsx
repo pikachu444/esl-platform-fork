@@ -66,7 +66,11 @@ export function CornerDrop() {
         <ErrorLine text={run.progress.error} />
         {run.alive && <button type="button" className="btn" disabled={!allowed || busy} onClick={() => void cancel()}>실행 취소</button>}
         {shapeResult?.summary && <>
-          <div className="table-wrap"><table className="table" aria-label="탄성 방법론 검증 결과"><thead><tr><th>방법</th><th>독립 사례 통과</th><th>최대 변위장 오차</th><th>변화 방향 일치</th><th>선정</th></tr></thead><tbody>{Object.entries(shapeResult.summary).map(([id,row]) => { const s=row.regions.small;return <tr key={id}><td>{row.label}</td><td>{s.passed}/{s.tests}</td><td>{s.worst_field_l2==null ? "–" : `${fmt(s.worst_field_l2*100,1)}%`}</td><td>{s.direction_agreement==null ? "–" : `${fmt(s.direction_agreement*100,1)}%`}</td><td>{s.recommended_in_region ? "검증 범위 내 통과" : "선정 기준 미충족"}</td></tr>;})}</tbody></table></div>
+          <div className="table-wrap"><table className="table" aria-label="탄성 방법론 검증 결과"><thead><tr><th>방법</th><th>독립 사례 통과</th><th>최대 변위장 오차</th><th>변화 방향 일치</th><th>선정</th></tr></thead><tbody>{Object.entries(shapeResult.summary).map(([id,row]) => {
+            const s = row.regions.small;
+            const verdict = row.control ? "비교 대조군" : s.recommended_in_region ? "검증 범위 내 통과" : "선정 기준 미충족";
+            return <tr key={id}><td>{row.label}</td><td>{s.passed}/{s.tests}</td><td>{s.worst_field_l2==null ? "–" : `${fmt(s.worst_field_l2*100,1)}%`}</td><td>{s.direction_agreement==null ? "–" : `${fmt(s.direction_agreement*100,1)}%`}</td><td>{verdict}</td></tr>;
+          })}</tbody></table></div>
           <div className="actions">{[["report.html","그림 포함 보고서"],["method_results.json","전체 검증 JSON"],["benchmark.png","방법별 오차"],["contours.png","실제·예측 컨투어"]].map(([file,label]) => <a key={file} className="btn" href={cornerDrop.file(projectId,run.id,file)} download>{label} 받기</a>)}</div>
         </>}
         {legacyResult && <>

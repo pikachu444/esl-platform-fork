@@ -47,3 +47,36 @@ def test_elastic_rigid_modes_do_not_create_condensed_loading():
     u=np.broadcast_to([.2,-.1,.3],x.shape)+np.cross([.001,-.002,.003],r)
     f=model.condensed_forces(u)
     assert np.linalg.norm(f)<1e-6
+
+
+def test_snapshot_uses_reference_basis_and_replays_baseline():
+    cfg, mesh, u, g, supports = setup()
+    fields = project_fields(mesh['x0'], np.concatenate([u, g]))
+    ref = Reference(mesh, fields, [], 0.05, supports, basis_energy_fraction=1.)
+    methods = ['snapshot_esl', 'reference_replay']
+    density = cfg['material']['density_tonne_mm3']
+    pred, record = ref.predict(mesh, np.zeros(6), nodal_mass(mesh, density), methods)
+    np.testing.assert_allclose(pred['snapshot_esl'], fields, atol=1e-8)
+    assert record['snapshot_esl']['details'][0]['rank'] == 2
+
+    change = np.array([.05, 0, 0, 0, 0, 0])
+    candidate = make_mesh(cfg, mesh['depths']+change)
+    pred, record = ref.predict(candidate, change, nodal_mass(candidate, density), methods)
+    assert record['snapshot_esl']['gauge_relative_l2'] == 0.
+    assert relative_error(pred['snapshot_esl'], pred['reference_replay']) > 1e-5
+    np.testing.assert_allclose(pred['reference_replay'], project_fields(candidate['x0'], fields), atol=1e-12)
+
+
+def test_balanced_increment_uses_candidate_geometry_and_removes_wrench():
+    cfg, mesh, u, g, supports = setup()
+    history = project_fields(mesh['x0'], np.concatenate([u, u+g]))
+    ref = Reference(mesh, history, [], .05, supports)
+    change = np.array([.05, 0, 0, 0, 0, 0])
+    candidate = make_mesh(cfg, mesh['depths']+change)
+    methods = ['incremental', 'incremental_balanced']
+    _, record = ref.predict(candidate, change, nodal_mass(candidate, cfg['material']['density_tonne_mm3']), methods)
+    raw, balanced = (record[m]['details'][0] for m in methods)
+    assert raw['applied']['moment_fraction'] > 1e-8
+    assert balanced['applied']['force_fraction'] < 1e-12
+    assert balanced['applied']['moment_fraction'] < 1e-12
+    assert record['incremental_balanced']['gauge_relative_l2'] < 1e-7

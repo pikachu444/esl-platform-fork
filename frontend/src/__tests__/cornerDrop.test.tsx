@@ -40,7 +40,7 @@ describe("실제 비교 실행 화면 연결", () => {
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
   it("새 탄성 방법 버튼은 독립 검증 프리셋으로 실행한다", async () => {
-    const shape_methods=["frozen","balanced","incremental","first_order_load","first_order_balanced","response_taylor"].map(id=>({id,label:id,family:"검증",extra_dynamic_runs:id.includes("first_order")||id==="response_taylor"?12:0}));
+    const shape_methods=["frozen","balanced","incremental","incremental_balanced","first_order_load","first_order_balanced","response_taylor","snapshot_esl","reference_replay"].map(id=>({id,label:id,family:"검증",extra_dynamic_runs:id.includes("first_order")||id==="response_taylor"?12:0}));
     const fetcher=vi.fn(async (url:RequestInfo|URL,opts?:RequestInit)=>new Response(String(url).endsWith("/settings")?JSON.stringify({available:true,can_execute:true,methods,shape_methods}):opts?.method==="POST"?JSON.stringify({id:"b".repeat(32)}):"[]"));
     vi.stubGlobal("fetch",fetcher);mount();
     for(const m of shape_methods){
