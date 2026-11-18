@@ -24,3 +24,14 @@ python -m esl.benchmarks.first_order_esl_example
 ## 로컬 Codex에 전달할 지시문
 
 > 이 작업은 내 Windows PC의 WSL2 Ubuntu에서 수행한다. `pikachu444/esl-platform-fork`의 `codex/esl-shape-method-selection`을 기준으로 삼고, 기존 로컬 변경사항을 보호한다. `AGENTS.md`, `docs/contracts/esl_shape_method_selection.md`, `docs/local_codex_shape_methods.md`를 먼저 읽는다. `LAW1` 탄성 코너 낙하 기준부터 재현하고, 코드에 고정된 독립 비드 깊이 변경으로만 ESL 방법을 비교한다. 공통 시각의 변위장, 피크 RMS, 변화 방향, 구속 의존성과 비드 5 민감도의 시간증분·메시 의존성을 실제 솔버 결과로 확인한다. 보고서와 JSON의 수치를 근거로 통과 여부와 검증 범위를 기록한다. PC에서 받아 쓰는 파일과 솔버 경로를 기록하고 중간 결과를 별도 작업 브랜치에 커밋·푸시한다. PR 생성과 `main` 병합은 하지 않는다.
+
+## 평판에 비드를 처음 넣었을 때의 과대 변위 검증
+
+이 검증은 비드가 포함된 2 mm 기준판의 깊이 민감도 실험과 별개입니다. 평판에서 얻은 ESL을 형상만 바꾼 판에 적용하며, 그 판을 다시 낙하시킨 결과와 비교합니다.
+
+```bash
+python -m esl.benchmarks.bead_insertion all --solver out/solver/OpenCourant --out out/bead-insertion --jobs 4
+python -m esl.benchmarks.bead_insertion extended --solver out/solver/OpenCourant --out out/bead-insertion --jobs 4
+```
+
+`peak_displacement.csv`는 방법별 최대 절점 변위와 RMS, `comparison.json`은 시간 이력과 보간 검증, `extended_dynamic.json`은 80 ms 직접 낙하 결과입니다. 낙하 장면과 단면은 [결과 설명](benchmarks/bead_insertion/README.md)에서 확인할 수 있습니다.

@@ -96,6 +96,7 @@ class Reference:
                         pred.append(full[:,:3]);other.append(afull[:,:3])
                         details.append(dict(raw=resultants(mesh['x0'],raw),applied=resultants(mesh['x0'],f),
                             reactions=resultants(mesh['x0'],reaction),
+                            compliance_Nmm=float(np.sum(f*full[:,:3])),
                             max_reaction_N=float(np.linalg.norm(reaction,axis=1).max()),
                             relative_reaction=float(np.linalg.norm(reaction)/max(np.linalg.norm(f),1e-20)),
                             relative_balance_correction=float(np.linalg.norm(correction)/max(np.linalg.norm(raw),1e-20))))

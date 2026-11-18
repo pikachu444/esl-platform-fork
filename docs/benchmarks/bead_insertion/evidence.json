@@ -1,0 +1,1812 @@
+{
+  "methods": [
+    "dynamic",
+    "frozen",
+    "balanced",
+    "snapshot_esl",
+    "reference_replay"
+  ],
+  "protocols": {
+    "inclined_coarse": {
+      "tilt_deg": 60.0,
+      "elements": 960,
+      "dt_factor": 0.225,
+      "nodes_at_static_gauge": {
+        "primary": [
+          [
+            1025,
+            "123"
+          ],
+          [
+            1001,
+            "13"
+          ],
+          [
+            25,
+            "3"
+          ]
+        ],
+        "alternate": [
+          [
+            1,
+            "123"
+          ],
+          [
+            1001,
+            "23"
+          ],
+          [
+            25,
+            "3"
+          ]
+        ]
+      },
+      "cases": {
+        "flat": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 111.51252385410464,
+          "native_peak_rms_mm": 27.35031452895365,
+          "engine_seconds": 25.5659369440109,
+          "hashes": {
+            "starter_sha256": "627d41135a7eedad6950adbd00ae57bf5a28c7e672487d4f932cd67de1f9dbbd",
+            "engine_sha256": "815b14227ad9a273328a60ff6ecae9f0b7bca3514c6a1723e8e1b0345ba9cab8",
+            "native_fields_sha256": "9002c43d596a949f36ed359b274c6dbc98b18ceed325c9693ec35e04ef54e8e5"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 111.51252385410415,
+              "peak_rms_mm": 27.35031452895365,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": 0.0,
+              "change_rms_mm": 0.0,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": null,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 111.51252366928358,
+              "peak_rms_mm": 27.350314468613735,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -1.8482056418633874e-07,
+              "change_rms_mm": -6.033991439835518e-08,
+              "ratio_to_dynamic_max": 0.9999999983426027,
+              "field_error": 4.133922302078809e-09,
+              "change_field_error": null,
+              "gauge_error": 4.378815967925641e-09
+            },
+            "balanced": {
+              "peak_max_mm": 111.51252368768577,
+              "peak_rms_mm": 27.350314467211142,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -1.6641837419228978e-07,
+              "change_rms_mm": -6.174250799517722e-08,
+              "ratio_to_dynamic_max": 0.9999999985076261,
+              "field_error": 4.3422974390925506e-09,
+              "change_field_error": null,
+              "gauge_error": 4.211937438029134e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 111.51252385410268,
+              "peak_rms_mm": 27.35031452895353,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -1.4637180356658064e-12,
+              "change_rms_mm": -1.2079226507921703e-13,
+              "ratio_to_dynamic_max": 0.9999999999999869,
+              "field_error": 6.326840525914383e-15,
+              "change_field_error": null,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 111.51252385410415,
+              "peak_rms_mm": 27.35031452895365,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": 0.0,
+              "change_rms_mm": 0.0,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 2.1189601317211817e-16,
+              "change_field_error": null,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 0.9999999999999702,
+            "ritz_ratio": 1.0,
+            "effective_ritz_ratio": 1.0,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 1.0,
+            "rho_max": 1.0
+          }
+        },
+        "bead5_200": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 88.8279585466131,
+          "native_peak_rms_mm": 25.23814949826969,
+          "engine_seconds": 25.133017711006687,
+          "hashes": {
+            "starter_sha256": "5ba2a3f26cd1dc6f0101d5034eba4fa21674ac0dd438afac743796bfbf885060",
+            "engine_sha256": "815b14227ad9a273328a60ff6ecae9f0b7bca3514c6a1723e8e1b0345ba9cab8",
+            "native_fields_sha256": "31d35fe5765a23bf4295f7e3da7a36f1ac8ff52edf6147c782700bf6a34c64eb"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 88.82795854661298,
+              "peak_rms_mm": 25.23810258906129,
+              "peak_max_time_ms": 38.400000000000006,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -22.68456530749117,
+              "change_rms_mm": -2.1122119398923616,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 22042.598005644573,
+              "peak_rms_mm": 6798.382243694208,
+              "peak_max_time_ms": 27.6,
+              "peak_rms_time_ms": 31.0,
+              "change_max_mm": 21931.08548179047,
+              "change_rms_mm": 6771.031929165255,
+              "ratio_to_dynamic_max": 248.14932557610896,
+              "field_error": 344.43706020986184,
+              "change_field_error": 1864.0132626912043,
+              "gauge_error": 1.5079950897022112
+            },
+            "balanced": {
+              "peak_max_mm": 11998.472836589064,
+              "peak_rms_mm": 2460.2762857121506,
+              "peak_max_time_ms": 37.00000000000001,
+              "peak_rms_time_ms": 36.2,
+              "change_max_mm": 11886.96031273496,
+              "change_rms_mm": 2432.925971183197,
+              "ratio_to_dynamic_max": 135.0754090593312,
+              "field_error": 110.77268148966584,
+              "change_field_error": 599.4759893572385,
+              "gauge_error": 2.9174544869384143e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 84.36936700003692,
+              "peak_rms_mm": 26.979443544871692,
+              "peak_max_time_ms": 39.400000000000006,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -27.14315685406723,
+              "change_rms_mm": -0.3708709840819573,
+              "ratio_to_dynamic_max": 0.9498064391040081,
+              "field_error": 0.22962970657935003,
+              "change_field_error": 1.242702566068246,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 111.51180678565012,
+              "peak_rms_mm": 27.350314527120915,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.0007170684540227512,
+              "change_rms_mm": -1.8327348527691356e-09,
+              "ratio_to_dynamic_max": 1.2553683390926256,
+              "field_error": 0.18478251582425667,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 4.629500503025845,
+            "ritz_ratio": 0.9671240943924909,
+            "effective_ritz_ratio": 4.629500503025845,
+            "ritz_falls_back_to_solve": true,
+            "rho_min": 1.0009014443767066,
+            "rho_max": 2.5212841519782256
+          }
+        },
+        "bead5_100": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 106.75788219321007,
+          "native_peak_rms_mm": 27.299810505711655,
+          "engine_seconds": 24.862719652999658,
+          "hashes": {
+            "starter_sha256": "89ac547d3630938a7460cb4c7dc6aa887a2691461912dbf396ea7b76ac648579",
+            "engine_sha256": "815b14227ad9a273328a60ff6ecae9f0b7bca3514c6a1723e8e1b0345ba9cab8",
+            "native_fields_sha256": "bfdb6fe94328f67ee129a137be55b804af81e65aaa8bc357b8b317009f4408be"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 106.75775613874525,
+              "peak_rms_mm": 27.299682416310237,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -4.754767715358895,
+              "change_rms_mm": -0.05063211264341305,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 16735.430707955533,
+              "peak_rms_mm": 4320.679825750953,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 35.2,
+              "change_max_mm": 16623.91818410143,
+              "change_rms_mm": 4293.329511221999,
+              "ratio_to_dynamic_max": 156.76079484291256,
+              "field_error": 213.50148545046952,
+              "change_field_error": 2739.082090016821,
+              "gauge_error": 1.2753731148753105
+            },
+            "balanced": {
+              "peak_max_mm": 12942.533403601985,
+              "peak_rms_mm": 2505.514332301572,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 39.800000000000004,
+              "change_max_mm": 12831.02087974788,
+              "change_rms_mm": 2478.164017772618,
+              "ratio_to_dynamic_max": 121.23272230245755,
+              "field_error": 107.03297529792562,
+              "change_field_error": 1373.1619012448239,
+              "gauge_error": 4.774009492011658e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 96.1936725473884,
+              "peak_rms_mm": 27.14551846163156,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -15.318851306715743,
+              "change_rms_mm": -0.20479606732208921,
+              "ratio_to_dynamic_max": 0.9010462192777124,
+              "field_error": 0.11819816620903573,
+              "change_field_error": 1.516403876314525,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 111.51216529927605,
+              "peak_rms_mm": 27.350314528495463,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.00035855482809665773,
+              "change_rms_mm": -4.58186377727543e-10,
+              "ratio_to_dynamic_max": 1.0445345549821397,
+              "field_error": 0.07794636247983294,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 2.570964755281491,
+            "ritz_ratio": 0.9852957082839238,
+            "effective_ritz_ratio": 2.570964755281491,
+            "ritz_falls_back_to_solve": true,
+            "rho_min": 0.9988886241201554,
+            "rho_max": 1.6294978350890412
+          }
+        },
+        "bead5_050": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 110.23512090165569,
+          "native_peak_rms_mm": 27.408617430407173,
+          "engine_seconds": 21.852592666997225,
+          "hashes": {
+            "starter_sha256": "f08c0432e34774ac897e20dc50ab2ec500fe606611cdbe19544e14d777c8d5ae",
+            "engine_sha256": "815b14227ad9a273328a60ff6ecae9f0b7bca3514c6a1723e8e1b0345ba9cab8",
+            "native_fields_sha256": "31a089ac686cb51d58df7075999a71ad44cdd7d3c255df2ef028368d8b2819b6"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 110.23462949488113,
+              "peak_rms_mm": 27.408231514972424,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -1.277894359223012,
+              "change_rms_mm": 0.05791698601877471,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 12301.326450124787,
+              "peak_rms_mm": 2816.7545738410713,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 35.2,
+              "change_max_mm": 12189.813926270683,
+              "change_rms_mm": 2789.4042593121176,
+              "ratio_to_dynamic_max": 111.59221477399724,
+              "field_error": 138.82764235111472,
+              "change_field_error": 5327.336848007258,
+              "gauge_error": 1.0726010260731462
+            },
+            "balanced": {
+              "peak_max_mm": 9812.553546160321,
+              "peak_rms_mm": 1930.4587145189926,
+              "peak_max_time_ms": 39.800000000000004,
+              "peak_rms_time_ms": 39.800000000000004,
+              "change_max_mm": 9701.041022306217,
+              "change_rms_mm": 1903.1083999900388,
+              "ratio_to_dynamic_max": 89.01516330325198,
+              "field_error": 82.33738014566579,
+              "change_field_error": 3159.5938084794857,
+              "gauge_error": 2.342747865734799e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 103.47474334753095,
+              "peak_rms_mm": 27.23909542013658,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -8.037780506573199,
+              "change_rms_mm": -0.11121910881707109,
+              "ratio_to_dynamic_max": 0.938677290627043,
+              "field_error": 0.05313190433078173,
+              "change_field_error": 2.0388702635336307,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 111.51234457179302,
+              "peak_rms_mm": 27.350314528839103,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.00017928231112307458,
+              "change_rms_mm": -1.1454659443188575e-10,
+              "ratio_to_dynamic_max": 1.0115908683393473,
+              "field_error": 0.02605948268562078,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 1.5554943817979725,
+            "ritz_ratio": 0.9931076935630682,
+            "effective_ritz_ratio": 0.9931076935630682,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 0.9989310966782969,
+            "rho_max": 1.2818403539710912
+          }
+        },
+        "bead5_150": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.5,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 99.20804739647681,
+          "native_peak_rms_mm": 26.79615000590331,
+          "engine_seconds": 22.17383046699979,
+          "hashes": {
+            "starter_sha256": "59719c852cc1dcbcb7ee8606b4675cabce56e073fc1bb661c28eebe0470b941b",
+            "engine_sha256": "815b14227ad9a273328a60ff6ecae9f0b7bca3514c6a1723e8e1b0345ba9cab8",
+            "native_fields_sha256": "334995d81617e57925c32724cc3f49636d52445d86c2b7e61b2e4eb80355e531"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 99.2079543865115,
+              "peak_rms_mm": 26.795910264026663,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -12.304569467592643,
+              "change_rms_mm": -0.5544042649269869,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 17426.509463350427,
+              "peak_rms_mm": 5473.006538901476,
+              "peak_max_time_ms": 35.0,
+              "peak_rms_time_ms": 31.0,
+              "change_max_mm": 17314.996939496323,
+              "change_rms_mm": 5445.656224372523,
+              "ratio_to_dynamic_max": 175.6563732325053,
+              "field_error": 273.0129758629675,
+              "change_field_error": 1989.6485834336324,
+              "gauge_error": 1.4341154760830765
+            },
+            "balanced": {
+              "peak_max_mm": 12747.911040703744,
+              "peak_rms_mm": 2426.4305687968376,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 36.2,
+              "change_max_mm": 12636.39851684964,
+              "change_rms_mm": 2399.080254267884,
+              "ratio_to_dynamic_max": 128.49686418327133,
+              "field_error": 107.93070914304919,
+              "change_field_error": 786.571341075162,
+              "gauge_error": 2.666531103098057e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 89.78658603205076,
+              "peak_rms_mm": 27.061729121507906,
+              "peak_max_time_ms": 39.400000000000006,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -21.725937822053382,
+              "change_rms_mm": -0.2885854074457441,
+              "ratio_to_dynamic_max": 0.905034143555109,
+              "field_error": 0.18151944774544046,
+              "change_field_error": 1.3228672041348197,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 111.51198603705964,
+              "peak_rms_mm": 27.350314527922734,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.0005378170445027308,
+              "change_rms_mm": -1.030915797173293e-09,
+              "ratio_to_dynamic_max": 1.1240226323245408,
+              "field_error": 0.13721668144623606,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 3.5566718844684404,
+            "ritz_ratio": 0.976615711041006,
+            "effective_ritz_ratio": 3.5566718844684404,
+            "ritz_falls_back_to_solve": true,
+            "rho_min": 0.9998715585758207,
+            "rho_max": 2.042744892497228
+          }
+        },
+        "bead1_200": {
+          "depths_mm": [
+            2.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 102.93760812924513,
+          "native_peak_rms_mm": 26.375524934485057,
+          "engine_seconds": 26.430104548009695,
+          "hashes": {
+            "starter_sha256": "6f12e0fe031d641d8a326d9f7911690dec16fb386ac9ce2b1ff564aa14745e8a",
+            "engine_sha256": "815b14227ad9a273328a60ff6ecae9f0b7bca3514c6a1723e8e1b0345ba9cab8",
+            "native_fields_sha256": "fe25812e647e382ce29ac9afcc4da1626709046968a2c46f1f59f58dc70a4062"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 102.93745554679718,
+              "peak_rms_mm": 26.375272522524593,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -8.575068307306964,
+              "change_rms_mm": -0.9750420064290566,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 32040.143103491377,
+              "peak_rms_mm": 10049.252075739316,
+              "peak_max_time_ms": 39.400000000000006,
+              "peak_rms_time_ms": 39.400000000000006,
+              "change_max_mm": 31928.630579637273,
+              "change_rms_mm": 10021.901761210362,
+              "ratio_to_dynamic_max": 311.25835521478734,
+              "field_error": 396.42478497007215,
+              "change_field_error": 2405.408835213109,
+              "gauge_error": 1.0843782295761566
+            },
+            "balanced": {
+              "peak_max_mm": 20315.278516014685,
+              "peak_rms_mm": 5164.6632413165435,
+              "peak_max_time_ms": 38.6,
+              "peak_rms_time_ms": 38.6,
+              "change_max_mm": 20203.76599216058,
+              "change_rms_mm": 5137.31292678759,
+              "ratio_to_dynamic_max": 197.35555350675054,
+              "field_error": 188.18532320739152,
+              "change_field_error": 1141.8626086526542,
+              "gauge_error": 2.8529528760529755e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 106.12418794198217,
+              "peak_rms_mm": 26.915309446158503,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -5.388335912121974,
+              "change_rms_mm": -0.43500508279514705,
+              "ratio_to_dynamic_max": 1.030957947991402,
+              "field_error": 0.1594548254846804,
+              "change_field_error": 0.9675329610563347,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 111.51108284732972,
+              "peak_rms_mm": 27.3503145215383,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.0014410067744279331,
+              "change_rms_mm": -7.4153483353711636e-09,
+              "ratio_to_dynamic_max": 1.0832896758035253,
+              "field_error": 0.16480557448977298,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 5.77577749356015,
+            "ritz_ratio": 0.9753667846195091,
+            "effective_ritz_ratio": 0.9753667846195091,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 1.0002192444472338,
+            "rho_max": 1.0401296416182064
+          }
+        },
+        "six_200": {
+          "depths_mm": [
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0
+          ],
+          "reused": true,
+          "native_peak_max_mm": 77.12056082556076,
+          "native_peak_rms_mm": 23.319387144107445,
+          "engine_seconds": 28.156659344997024,
+          "hashes": {
+            "starter_sha256": "da14f757fe9ce19e7c1e31d9aec748b431ab3229e2119984308a89a202d5cd03",
+            "engine_sha256": "815b14227ad9a273328a60ff6ecae9f0b7bca3514c6a1723e8e1b0345ba9cab8",
+            "native_fields_sha256": "e3727cac8571bae6b9fbd89f9e8fb106b0177f792349a46134dbbfe85e74bad3"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 77.12040262232766,
+              "peak_rms_mm": 23.319379756164352,
+              "peak_max_time_ms": 32.800000000000004,
+              "peak_rms_time_ms": 39.400000000000006,
+              "change_max_mm": -34.392121231776486,
+              "change_rms_mm": -4.030934772789298,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 43927.4373060999,
+              "peak_rms_mm": 13579.162010116379,
+              "peak_max_time_ms": 38.2,
+              "peak_rms_time_ms": 35.0,
+              "change_max_mm": 43815.92478224579,
+              "change_rms_mm": 13551.811695587425,
+              "ratio_to_dynamic_max": 569.5955390847786,
+              "field_error": 571.0710375388229,
+              "change_field_error": 1780.8407415904985,
+              "gauge_error": 1.0272372626931212
+            },
+            "balanced": {
+              "peak_max_mm": 32155.302756803307,
+              "peak_rms_mm": 8396.59693068915,
+              "peak_max_time_ms": 38.6,
+              "peak_rms_time_ms": 39.199999999999996,
+              "change_max_mm": 32043.790232949203,
+              "change_rms_mm": 8369.246616160195,
+              "ratio_to_dynamic_max": 416.94936311826,
+              "field_error": 296.06499344063934,
+              "change_field_error": 923.255720952178,
+              "gauge_error": 1.7100046151740955e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 84.02806960539792,
+              "peak_rms_mm": 24.957629522907535,
+              "peak_max_time_ms": 38.800000000000004,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -27.48445424870623,
+              "change_rms_mm": -2.392685006046115,
+              "ratio_to_dynamic_max": 1.0895699030112476,
+              "field_error": 0.341967489658657,
+              "change_field_error": 1.0663990954753384,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 111.51461331943787,
+              "peak_rms_mm": 27.35031451228193,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": 0.0020894653337251157,
+              "change_rms_mm": -1.6671720004524104e-08,
+              "ratio_to_dynamic_max": 1.4459806941821192,
+              "field_error": 0.32067496222530817,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 19.291670561877844,
+            "ritz_ratio": 0.9117954371276925,
+            "effective_ritz_ratio": 19.291670561877844,
+            "ritz_falls_back_to_solve": true,
+            "rho_min": 1.0041789958082723,
+            "rho_max": 2.521845163965872
+          }
+        }
+      },
+      "direct_interpolation": {
+        "fit_depths_mm": [
+          0,
+          1,
+          2
+        ],
+        "holdouts": [
+          {
+            "depth_mm": 0.5,
+            "case": "bead5_050",
+            "metrics": {
+              "peak_max_mm": {
+                "direct_mm": 110.23462949488113,
+                "predicted_mm": 109.1351399964247,
+                "direct_change_mm": -1.277894359223012,
+                "predicted_change_mm": -2.3773838576794475,
+                "abs_prediction_error_mm": 1.0994894984564354
+              },
+              "peak_rms_mm": {
+                "direct_mm": 27.408231514972424,
+                "predicted_mm": 27.324998472631943,
+                "direct_change_mm": 0.05791698601877471,
+                "predicted_change_mm": -0.025316056321706526,
+                "abs_prediction_error_mm": 0.08323304234048123
+              }
+            }
+          },
+          {
+            "depth_mm": 1.5,
+            "case": "bead5_150",
+            "metrics": {
+              "peak_max_mm": {
+                "direct_mm": 99.2079543865115,
+                "predicted_mm": 97.79285734267911,
+                "direct_change_mm": -12.304569467592643,
+                "predicted_change_mm": -13.719666511425032,
+                "abs_prediction_error_mm": 1.4150970438323895
+              },
+              "peak_rms_mm": {
+                "direct_mm": 26.795910264026663,
+                "predicted_mm": 26.268892502685762,
+                "direct_change_mm": -0.5544042649269869,
+                "predicted_change_mm": -1.0814220262678873,
+                "abs_prediction_error_mm": 0.5270177613409004
+              }
+            }
+          }
+        ]
+      }
+    },
+    "inclined_fine": {
+      "tilt_deg": 60.0,
+      "elements": 3840,
+      "dt_factor": 0.45,
+      "nodes_at_static_gauge": {
+        "primary": [
+          [
+            3969,
+            "123"
+          ],
+          [
+            3921,
+            "13"
+          ],
+          [
+            49,
+            "3"
+          ]
+        ],
+        "alternate": [
+          [
+            1,
+            "123"
+          ],
+          [
+            3921,
+            "23"
+          ],
+          [
+            49,
+            "3"
+          ]
+        ]
+      },
+      "cases": {
+        "flat": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 113.00614848324815,
+          "native_peak_rms_mm": 26.663492489932835,
+          "engine_seconds": 75.76376492300187,
+          "hashes": {
+            "starter_sha256": "077416c51c9672a41379b11885a430609761f2039b579574c2749228ff4bf439",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "968132aa03ac6325f36882bfc1d731148773be0e8c643e025586b46a866110f8"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 113.00582773453672,
+              "peak_rms_mm": 26.663231385919975,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": 0.0,
+              "change_rms_mm": 0.0,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": null,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 113.00582706853204,
+              "peak_rms_mm": 26.66323115564021,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -6.660046807382969e-07,
+              "change_rms_mm": -2.3027976325806776e-07,
+              "ratio_to_dynamic_max": 0.9999999941064572,
+              "field_error": 1.465654129012108e-08,
+              "change_field_error": null,
+              "gauge_error": 1.839826682212326e-08
+            },
+            "balanced": {
+              "peak_max_mm": 113.0058271348219,
+              "peak_rms_mm": 26.66323117052449,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -5.997148235792338e-07,
+              "change_rms_mm": -2.1539548455962176e-07,
+              "ratio_to_dynamic_max": 0.9999999946930629,
+              "field_error": 1.501044427754584e-08,
+              "change_field_error": null,
+              "gauge_error": 1.782660784464148e-08
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 113.00582773453759,
+              "peak_rms_mm": 26.66323138591989,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": 8.668621376273222e-13,
+              "change_rms_mm": -8.526512829121202e-14,
+              "ratio_to_dynamic_max": 1.0000000000000078,
+              "field_error": 1.151930203725879e-14,
+              "change_field_error": null,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 113.00582773453672,
+              "peak_rms_mm": 26.66323138591997,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": 0.0,
+              "change_rms_mm": -3.552713678800501e-15,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 1.9376253173819057e-16,
+              "change_field_error": null,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 0.9999999999998621,
+            "ritz_ratio": 1.0,
+            "effective_ritz_ratio": 1.0,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 1.0,
+            "rho_max": 1.0
+          }
+        },
+        "bead5_200": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 89.532646059318,
+          "native_peak_rms_mm": 24.526404130444774,
+          "engine_seconds": 76.97129485799815,
+          "hashes": {
+            "starter_sha256": "2f551703eb99fe05b76ea82ee141cf386aa36d086deba2c0b91211dcfe6c7a38",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "c89e1ce0a17b05fdd22ae07f8a937e8ae084dd36845670af57de14c3dc13400b"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 89.53263852239877,
+              "peak_rms_mm": 24.52614671212546,
+              "peak_max_time_ms": 38.2,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -23.473189212137953,
+              "change_rms_mm": -2.137084673794515,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 22202.437579020723,
+              "peak_rms_mm": 6496.156363659349,
+              "peak_max_time_ms": 31.200000000000003,
+              "peak_rms_time_ms": 31.200000000000003,
+              "change_max_mm": 22089.431751286185,
+              "change_rms_mm": 6469.493132273429,
+              "ratio_to_dynamic_max": 247.98149530091467,
+              "field_error": 337.0014322159806,
+              "change_field_error": 1794.2687482844053,
+              "gauge_error": 1.5498328517859266
+            },
+            "balanced": {
+              "peak_max_mm": 10585.923610254471,
+              "peak_rms_mm": 2182.9889087121533,
+              "peak_max_time_ms": 35.4,
+              "peak_rms_time_ms": 35.4,
+              "change_max_mm": 10472.917782519935,
+              "change_rms_mm": 2156.3256773262333,
+              "ratio_to_dynamic_max": 118.23535846769605,
+              "field_error": 100.03884090102085,
+              "change_field_error": 532.6284955615855,
+              "gauge_error": 6.700541698701854e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 84.77535495872229,
+              "peak_rms_mm": 26.41259830049317,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -28.230472775814434,
+              "change_rms_mm": -0.25063308542680574,
+              "ratio_to_dynamic_max": 0.9468653706381464,
+              "field_error": 0.2361596196952023,
+              "change_field_error": 1.2573650575890292,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 113.00494053865687,
+              "peak_rms_mm": 26.66323138314002,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.000887195879855085,
+              "change_rms_mm": -2.7799558210972464e-09,
+              "ratio_to_dynamic_max": 1.26216475247053,
+              "field_error": 0.18782104550291334,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 4.342916699088609,
+            "ritz_ratio": 0.9658411009082094,
+            "effective_ritz_ratio": 4.342916699088609,
+            "ritz_falls_back_to_solve": true,
+            "rho_min": 1.0006647880516826,
+            "rho_max": 2.2361975852571003
+          }
+        },
+        "bead5_100": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 107.94363895416804,
+          "native_peak_rms_mm": 26.68063854442124,
+          "engine_seconds": 72.45510087099683,
+          "hashes": {
+            "starter_sha256": "fc602821bafe71c9de9e01aa9cc412a87f8a8e3899f4071c27cf52781dc2f503",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "7e26a1612086a1a0858a0132082412acf0a64405a42a88d00c5f662e0b19b2c4"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 107.94321589422245,
+              "peak_rms_mm": 26.680186189990824,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -5.0626118403142755,
+              "change_rms_mm": 0.01695480407084915,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 15834.571395120003,
+              "peak_rms_mm": 4084.075138468586,
+              "peak_max_time_ms": 33.800000000000004,
+              "peak_rms_time_ms": 34.2,
+              "change_max_mm": 15721.565567385467,
+              "change_rms_mm": 4057.411907082666,
+              "ratio_to_dynamic_max": 146.69353014863745,
+              "field_error": 206.79474342747264,
+              "change_field_error": 2534.0312571312197,
+              "gauge_error": 1.318930246478734
+            },
+            "balanced": {
+              "peak_max_mm": 12024.79638160135,
+              "peak_rms_mm": 2259.3919213394493,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 39.199999999999996,
+              "change_max_mm": 11911.790553866815,
+              "change_rms_mm": 2232.7286899535293,
+              "ratio_to_dynamic_max": 111.39927861131072,
+              "field_error": 100.06923436691997,
+              "change_field_error": 1226.2331409400663,
+              "gauge_error": 5.3564491605130365e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 97.30560613906987,
+              "peak_rms_mm": 26.53519777246762,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -15.700221595466857,
+              "change_rms_mm": -0.12803361345235587,
+              "ratio_to_dynamic_max": 0.90145179882748,
+              "field_error": 0.12350937881175601,
+              "change_field_error": 1.513465097180373,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 113.00538411015053,
+              "peak_rms_mm": 26.66323138522498,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.00044362438619316436,
+              "change_rms_mm": -6.949960607016692e-10,
+              "ratio_to_dynamic_max": 1.046896585153519,
+              "field_error": 0.08160702155725784,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 2.491611919231949,
+            "ritz_ratio": 0.9849666171719561,
+            "effective_ritz_ratio": 2.491611919231949,
+            "ritz_falls_back_to_solve": true,
+            "rho_min": 1.0002853156777347,
+            "rho_max": 1.5000496387979154
+          }
+        },
+        "bead5_050": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.5,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 111.71179853571762,
+          "native_peak_rms_mm": 26.763453449289745,
+          "engine_seconds": 76.72127891499258,
+          "hashes": {
+            "starter_sha256": "1aa339d8f36390d60950504d83deebb0bc1303b650850d0b0d72ea375fd90ea7",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "a6be5712bbcf6c76aa89e1dad185f2b3b11b9507343dabacbe529c596e761dd8"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 111.71156257329217,
+              "peak_rms_mm": 26.763261797305468,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -1.294265161244553,
+              "change_rms_mm": 0.10003041138549307,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 12080.447303870948,
+              "peak_rms_mm": 2719.2628616188063,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 34.2,
+              "change_max_mm": 11967.441476136411,
+              "change_rms_mm": 2692.5996302328863,
+              "ratio_to_dynamic_max": 108.13963233165913,
+              "field_error": 137.08550530973542,
+              "change_field_error": 4797.416187034909,
+              "gauge_error": 1.0934062103073587
+            },
+            "balanced": {
+              "peak_max_mm": 9609.178852501782,
+              "peak_rms_mm": 1816.440173061658,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 39.199999999999996,
+              "change_max_mm": 9496.173024767246,
+              "change_rms_mm": 1789.776941675738,
+              "ratio_to_dynamic_max": 86.01776424170374,
+              "field_error": 80.40476717480306,
+              "change_field_error": 2813.828717249361,
+              "gauge_error": 8.548264544209108e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 104.84281605397184,
+              "peak_rms_mm": 26.59455220060479,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -8.163011680564878,
+              "change_rms_mm": -0.06867918531518313,
+              "ratio_to_dynamic_max": 0.9385135579424569,
+              "field_error": 0.05579729410778817,
+              "change_field_error": 1.9526706440672867,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 113.00560591606856,
+              "peak_rms_mm": 26.663231385746226,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.0002218184681623825,
+              "change_rms_mm": -1.737490151754173e-10,
+              "ratio_to_dynamic_max": 1.0115837905492315,
+              "field_error": 0.02857486196011326,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 1.5493728458916063,
+            "ritz_ratio": 0.9930280036620887,
+            "effective_ritz_ratio": 0.9930280036620887,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 1.000130746542702,
+            "rho_max": 1.2203682489116827
+          }
+        },
+        "bead5_150": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.5,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 100.04191783091751,
+          "native_peak_rms_mm": 26.052895157325732,
+          "engine_seconds": 77.29098527999304,
+          "hashes": {
+            "starter_sha256": "a47b5be5729696375f58459681cb769cdda58910a198a0f1c675c41601886155",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "da2554150719b4944593542e6152357d4233cd19c32643a7aa96e9cfad070774"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 100.0418950239969,
+              "peak_rms_mm": 26.05283925816841,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -12.963932710539822,
+              "change_rms_mm": -0.6103921277515632,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 16533.11253576992,
+              "peak_rms_mm": 5200.155144636546,
+              "peak_max_time_ms": 31.200000000000003,
+              "peak_rms_time_ms": 31.200000000000003,
+              "change_max_mm": 16420.106708035382,
+              "change_rms_mm": 5173.491913250626,
+              "ratio_to_dynamic_max": 165.26188884970787,
+              "field_error": 265.1337222032816,
+              "change_field_error": 1861.6147109887052,
+              "gauge_error": 1.4813696322326584
+            },
+            "balanced": {
+              "peak_max_mm": 11464.053168663935,
+              "peak_rms_mm": 2141.8405654272074,
+              "peak_max_time_ms": 35.4,
+              "peak_rms_time_ms": 35.4,
+              "change_max_mm": 11351.047340929399,
+              "change_rms_mm": 2115.1773340412874,
+              "ratio_to_dynamic_max": 114.5925231215789,
+              "field_error": 98.28759562617604,
+              "change_field_error": 690.1183010779373,
+              "gauge_error": 5.732870009514527e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 90.59420986176907,
+              "peak_rms_mm": 26.477428092189914,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -22.41161787276765,
+              "change_rms_mm": -0.18580329373006066,
+              "ratio_to_dynamic_max": 0.9055627129018136,
+              "field_error": 0.18968261165728156,
+              "change_field_error": 1.3318409191615932,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 113.00516231745567,
+              "peak_rms_mm": 26.66323138435624,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.0006654170810520554,
+              "change_rms_mm": -1.563734031151398e-09,
+              "ratio_to_dynamic_max": 1.1295783860386621,
+              "field_error": 0.14242137249896827,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 3.3803807320918904,
+            "ritz_ratio": 0.9758804867585192,
+            "effective_ritz_ratio": 3.3803807320918904,
+            "ritz_falls_back_to_solve": true,
+            "rho_min": 1.0004634303872613,
+            "rho_max": 1.8387829232120978
+          }
+        },
+        "bead1_200": {
+          "depths_mm": [
+            2.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 103.55976332538778,
+          "native_peak_rms_mm": 25.40035281738276,
+          "engine_seconds": 75.16331581800478,
+          "hashes": {
+            "starter_sha256": "6097d9338d1a5b809528dc813501364ffcefdcf147ff9d4406b2145ec78f56d7",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "ee466727004932f51fd919beb429692ce9528d0716debb1dde1b22b1564dc4c2"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 103.55971202192595,
+              "peak_rms_mm": 25.400255897605433,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -9.446115712610776,
+              "change_rms_mm": -1.2629754883145416,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 32871.09179724462,
+              "peak_rms_mm": 10164.85929246294,
+              "peak_max_time_ms": 38.400000000000006,
+              "peak_rms_time_ms": 38.400000000000006,
+              "change_max_mm": 32758.08596951008,
+              "change_rms_mm": 10138.196061077018,
+              "ratio_to_dynamic_max": 317.41196605766015,
+              "field_error": 405.65591306674696,
+              "change_field_error": 2357.02579172536,
+              "gauge_error": 1.0881979487260514
+            },
+            "balanced": {
+              "peak_max_mm": 20395.724042341524,
+              "peak_rms_mm": 5070.5006070462805,
+              "peak_max_time_ms": 38.2,
+              "peak_rms_time_ms": 38.2,
+              "change_max_mm": 20282.718214606986,
+              "change_rms_mm": 5043.8373756603605,
+              "ratio_to_dynamic_max": 196.94651176727186,
+              "field_error": 191.2388807754471,
+              "change_field_error": 1111.1756536733935,
+              "gauge_error": 1.582948593122228e-08
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 107.23510121424434,
+              "peak_rms_mm": 26.223985880046424,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -5.770726520292385,
+              "change_rms_mm": -0.4392455058735507,
+              "ratio_to_dynamic_max": 1.0354905312168137,
+              "field_error": 0.16620106542538007,
+              "change_field_error": 0.9656957662919547,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 113.0042366305887,
+              "peak_rms_mm": 26.663231376937834,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -0.0015911039480300815,
+              "change_rms_mm": -8.982141253000009e-09,
+              "ratio_to_dynamic_max": 1.0911988303585,
+              "field_error": 0.1721049954102555,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 6.0072106713304985,
+            "ritz_ratio": 0.97454092617302,
+            "effective_ritz_ratio": 0.97454092617302,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 1.0001999381485234,
+            "rho_max": 1.0414207844877332
+          }
+        },
+        "six_200": {
+          "depths_mm": [
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0
+          ],
+          "reused": true,
+          "native_peak_max_mm": 79.11040845758386,
+          "native_peak_rms_mm": 23.103039289510946,
+          "engine_seconds": 83.70447961598984,
+          "hashes": {
+            "starter_sha256": "69172b73cd0f2a5d182bdcdb59ddabcdd3c514b92aa2d2b11a423260edbd615f",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "c3fdb5718d094c568a66f4719b4c5d9913ef386636e01a475d1a5269b1697ace"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 79.10992561484291,
+              "peak_rms_mm": 23.103037499268922,
+              "peak_max_time_ms": 32.6,
+              "peak_rms_time_ms": 39.400000000000006,
+              "change_max_mm": -33.895902119693815,
+              "change_rms_mm": -3.560193886651053,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 39287.26035525935,
+              "peak_rms_mm": 11917.24690186588,
+              "peak_max_time_ms": 37.400000000000006,
+              "peak_rms_time_ms": 37.400000000000006,
+              "change_max_mm": 39174.25452752481,
+              "change_rms_mm": 11890.583670479959,
+              "ratio_to_dynamic_max": 496.61606998007494,
+              "field_error": 502.1974155211389,
+              "change_field_error": 1572.3058570663716,
+              "gauge_error": 1.0275175639562888
+            },
+            "balanced": {
+              "peak_max_mm": 28863.03325111302,
+              "peak_rms_mm": 7358.1100603267905,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": 28750.02742337848,
+              "change_rms_mm": 7331.446828940871,
+              "ratio_to_dynamic_max": 364.84717975385917,
+              "field_error": 261.8202682230112,
+              "change_field_error": 819.7205491361217,
+              "gauge_error": 4.033412749414474e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 84.87966874941174,
+              "peak_rms_mm": 24.250656121469447,
+              "peak_max_time_ms": 38.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": -28.126158985124988,
+              "change_rms_mm": -2.4125752644505276,
+              "ratio_to_dynamic_max": 1.0729332392835202,
+              "field_error": 0.3444451174733171,
+              "change_field_error": 1.0784067358833602,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 113.00775193240375,
+              "peak_rms_mm": 26.66323137164647,
+              "peak_max_time_ms": 40.0,
+              "peak_rms_time_ms": 40.0,
+              "change_max_mm": 0.001924197867026578,
+              "change_rms_mm": -1.4273503268213972e-08,
+              "ratio_to_dynamic_max": 1.4284901806455599,
+              "field_error": 0.31940186018141864,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 17.645697064200846,
+            "ritz_ratio": 0.9072222793199695,
+            "effective_ritz_ratio": 17.645697064200846,
+            "ritz_falls_back_to_solve": true,
+            "rho_min": 1.002215370330771,
+            "rho_max": 2.237139276216727
+          }
+        }
+      },
+      "direct_interpolation": {
+        "fit_depths_mm": [
+          0,
+          1,
+          2
+        ],
+        "holdouts": [
+          {
+            "depth_mm": 0.5,
+            "case": "bead5_050",
+            "metrics": {
+              "peak_max_mm": {
+                "direct_mm": 111.71156257329217,
+                "predicted_mm": 110.47452181437959,
+                "direct_change_mm": -1.294265161244553,
+                "predicted_change_mm": -2.5313059201571377,
+                "abs_prediction_error_mm": 1.2370407589125847
+              },
+              "peak_rms_mm": {
+                "direct_mm": 26.763261797305468,
+                "predicted_mm": 26.6717087879554,
+                "direct_change_mm": 0.10003041138549307,
+                "predicted_change_mm": 0.008477402035424575,
+                "abs_prediction_error_mm": 0.09155300935006849
+              }
+            }
+          },
+          {
+            "depth_mm": 1.5,
+            "case": "bead5_150",
+            "metrics": {
+              "peak_max_mm": {
+                "direct_mm": 100.0418950239969,
+                "predicted_mm": 98.73792720831061,
+                "direct_change_mm": -12.963932710539822,
+                "predicted_change_mm": -14.267900526226114,
+                "abs_prediction_error_mm": 1.303967815686292
+              },
+              "peak_rms_mm": {
+                "direct_mm": 26.05283925816841,
+                "predicted_mm": 25.603166451058144,
+                "direct_change_mm": -0.6103921277515632,
+                "predicted_change_mm": -1.0600649348618312,
+                "abs_prediction_error_mm": 0.449672807110268
+              }
+            }
+          }
+        ]
+      }
+    },
+    "vertical": {
+      "tilt_deg": 90.0,
+      "elements": 960,
+      "dt_factor": 0.45,
+      "nodes_at_static_gauge": {
+        "primary": [
+          [
+            1025,
+            "123"
+          ],
+          [
+            1001,
+            "13"
+          ],
+          [
+            25,
+            "3"
+          ]
+        ],
+        "alternate": [
+          [
+            1,
+            "123"
+          ],
+          [
+            1001,
+            "23"
+          ],
+          [
+            25,
+            "3"
+          ]
+        ]
+      },
+      "cases": {
+        "flat": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 0.9052363389980528,
+          "native_peak_rms_mm": 0.08147535221540768,
+          "engine_seconds": 10.69468549999874,
+          "hashes": {
+            "starter_sha256": "6e61afc4c887f6fc8b775fdadbfbfb55812cdf36b6f6db9ba4ac187d439ea530",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "88c282ba0f8916da51e8012935b3f9e0a7751f54289cd4938a4b4230d80cf01e"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 0.9046603359742519,
+              "peak_rms_mm": 0.081441805479944,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 0.0,
+              "change_rms_mm": 0.0,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": null,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 0.904660335974254,
+              "peak_rms_mm": 0.08144180547994483,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 2.1094237467877974e-15,
+              "change_rms_mm": 8.326672684688674e-16,
+              "ratio_to_dynamic_max": 1.0000000000000024,
+              "field_error": 5.678037332262054e-11,
+              "change_field_error": null,
+              "gauge_error": 1.0267577689569e-11
+            },
+            "balanced": {
+              "peak_max_mm": 0.904660335974254,
+              "peak_rms_mm": 0.08144180547994448,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 2.1094237467877974e-15,
+              "change_rms_mm": 4.85722573273506e-16,
+              "ratio_to_dynamic_max": 1.0000000000000024,
+              "field_error": 5.548691535426315e-11,
+              "change_field_error": null,
+              "gauge_error": 9.01036669647779e-12
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 0.9046603359742535,
+              "peak_rms_mm": 0.08144180547994427,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 1.6653345369377348e-15,
+              "change_rms_mm": 2.7755575615628914e-16,
+              "ratio_to_dynamic_max": 1.0000000000000018,
+              "field_error": 2.27019684655674e-15,
+              "change_field_error": null,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 0.9046603359742519,
+              "peak_rms_mm": 0.081441805479944,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 0.0,
+              "change_rms_mm": 0.0,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 2.4703035774362e-16,
+              "change_field_error": null,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 1.0000000000000038,
+            "ritz_ratio": 1.0,
+            "effective_ritz_ratio": 1.0,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 1.0,
+            "rho_max": 1.0
+          }
+        },
+        "bead5_200": {
+          "depths_mm": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            2.0,
+            0.0
+          ],
+          "reused": false,
+          "native_peak_max_mm": 29.589010885176695,
+          "native_peak_rms_mm": 5.364339592369369,
+          "engine_seconds": 11.567431382994982,
+          "hashes": {
+            "starter_sha256": "f741c86e739e4ff977db42c8ff9c0a12b213f63548d425528ef235195c8c7479",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "619de8163a5741ee3b6701274b6204cd10261c6a7c8d38d9c270837fbb046cde"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 29.5862768755634,
+              "peak_rms_mm": 5.364273466670961,
+              "peak_max_time_ms": 6.4,
+              "peak_rms_time_ms": 13.4,
+              "change_max_mm": 28.681616539589147,
+              "change_rms_mm": 5.282831661191017,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 98.79402339935771,
+              "peak_rms_mm": 22.297217787356356,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 97.88936306338346,
+              "change_rms_mm": 22.215775981876412,
+              "ratio_to_dynamic_max": 3.3391840350468707,
+              "field_error": 1.3082295172479466,
+              "change_field_error": 1.3081991159602189,
+              "gauge_error": 1.47854010348394
+            },
+            "balanced": {
+              "peak_max_mm": 82.0356235122778,
+              "peak_rms_mm": 9.932123388799154,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 81.13096317630354,
+              "change_rms_mm": 9.85068158331921,
+              "ratio_to_dynamic_max": 2.7727592713780966,
+              "field_error": 1.1142821310281177,
+              "change_field_error": 1.114256236786145,
+              "gauge_error": 3.995347038609142e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 0.9079627098938334,
+              "peak_rms_mm": 0.08153533408512406,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 0.003302373919581547,
+              "change_rms_mm": 9.352860518006822e-05,
+              "ratio_to_dynamic_max": 0.03068864371521378,
+              "field_error": 1.0000232470007686,
+              "change_field_error": 1.0000000079635312,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 0.9046603562009393,
+              "peak_rms_mm": 0.08144180016664516,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 2.0226687436064594e-08,
+              "change_rms_mm": -5.3132988286908045e-09,
+              "ratio_to_dynamic_max": 0.030577025963957564,
+              "field_error": 1.0000232390370525,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 1.970263529713031,
+            "ritz_ratio": 0.9998550962035844,
+            "effective_ritz_ratio": 0.9998550962035844,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 0.9997461367213039,
+            "rho_max": 1.000220852680949
+          }
+        },
+        "six_200": {
+          "depths_mm": [
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0
+          ],
+          "reused": true,
+          "native_peak_max_mm": 28.562921972969622,
+          "native_peak_rms_mm": 5.028889205110613,
+          "engine_seconds": 13.045229685987579,
+          "hashes": {
+            "starter_sha256": "5b894e4683404c659656419e86e78619ebebf996cd817f4abe361b66a29ee221",
+            "engine_sha256": "b276594faa4d637789577d7e6d6c5e09a74adf694df662f901c36fd78e602e2d",
+            "native_fields_sha256": "4395ffba5c6d8c6f7aa43214a394832e3a4bd31801b1915a6c00bf755eaa7ad8"
+          },
+          "methods": {
+            "dynamic": {
+              "peak_max_mm": 28.561832219421245,
+              "peak_rms_mm": 5.028819380222499,
+              "peak_max_time_ms": 9.000000000000002,
+              "peak_rms_time_ms": 9.4,
+              "change_max_mm": 27.657171883446992,
+              "change_rms_mm": 4.947377574742555,
+              "ratio_to_dynamic_max": 1.0,
+              "field_error": 0.0,
+              "change_field_error": 0.0,
+              "gauge_error": null
+            },
+            "frozen": {
+              "peak_max_mm": 244.35968461670203,
+              "peak_rms_mm": 67.84426281637523,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 243.45502428072777,
+              "change_rms_mm": 67.7628210108953,
+              "ratio_to_dynamic_max": 8.555462504626867,
+              "field_error": 2.143668824752118,
+              "change_field_error": 2.1436186758884195,
+              "gauge_error": 1.1191407422610415
+            },
+            "balanced": {
+              "peak_max_mm": 175.3192321244521,
+              "peak_rms_mm": 36.96347823576982,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 174.41457178847784,
+              "change_rms_mm": 36.88203643028987,
+              "ratio_to_dynamic_max": 6.138234787516185,
+              "field_error": 1.4663726229886542,
+              "change_field_error": 1.4663383187528727,
+              "gauge_error": 1.039752527136816e-09
+            },
+            "snapshot_esl": {
+              "peak_max_mm": 0.9081565496307067,
+              "peak_rms_mm": 0.08160003818235127,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": 0.003496213656454805,
+              "change_rms_mm": 0.00015823270240727938,
+              "ratio_to_dynamic_max": 0.03179615868666807,
+              "field_error": 1.0000234516429247,
+              "change_field_error": 1.0000000571525105,
+              "gauge_error": 0.0
+            },
+            "reference_replay": {
+              "peak_max_mm": 0.9046602927430243,
+              "peak_rms_mm": 0.08144179365621326,
+              "peak_max_time_ms": 0.6000000000000001,
+              "peak_rms_time_ms": 0.6000000000000001,
+              "change_max_mm": -4.323122759775089e-08,
+              "change_rms_mm": -1.182373073060905e-08,
+              "ratio_to_dynamic_max": 0.03167374858143311,
+              "field_error": 1.0000233944890773,
+              "change_field_error": 1.0,
+              "gauge_error": 0.0
+            }
+          },
+          "stiffness": {
+            "solve_ratio": 4.063332893347484,
+            "ritz_ratio": 0.9999994164647873,
+            "effective_ritz_ratio": 0.9999994164647873,
+            "ritz_falls_back_to_solve": false,
+            "rho_min": 0.9983502333907265,
+            "rho_max": 1.0007163809260617
+          }
+        }
+      }
+    }
+  },
+  "solver": {
+    "starter_linux64_gf": "0bbea37273656b270bea53cf756b115bcd5d9a8875a3c41283922a3b927719d1",
+    "engine_linux64_gf": "54cc9fc2a7cea6f1215afb6da9109d368650ff1fa7985625cb111f47d7e92be4",
+    "anim_to_vtk_linux64_gf": "9c97eee2991f6949d16477831cc684165f53b790f498cbef51b8e8fd67bf28ae"
+  },
+  "native_runs_new": 18,
+  "native_runs_reused": 3,
+  "scene": {
+    "first_impulse_ms": [
+      0.1606625,
+      0.1803055
+    ],
+    "contact_frame_ms": 0.400592,
+    "contact_nodes": [
+      1
+    ],
+    "frame_times_ms": [
+      0.0,
+      0.400592,
+      18.0003,
+      38.2006
+    ],
+    "node_peak_mm": 89.532646059318
+  },
+  "extended": {
+    "tilt_deg": 60.0,
+    "elements": 3840,
+    "end_time_ms": 80,
+    "cases": {
+      "flat": {
+        "peak_max_mm": 116.73067098051347,
+        "peak_rms_mm": 37.436701017394576,
+        "peak_max_time_ms": 49.4005,
+        "peak_rms_time_ms": 63.400600000000004,
+        "native_valid": true,
+        "hashes": {
+          "starter_sha256": "077416c51c9672a41379b11885a430609761f2039b579574c2749228ff4bf439",
+          "engine_sha256": "11f4cb68582f2964d70c8e9ba516434a978d5d5e0e61959931da92539fb9feee",
+          "native_fields_sha256": "aba60e754b02d2710f4af311d9095c4dc0416a204ea2d2c6f089d61ef940851d"
+        }
+      },
+      "bead5_200": {
+        "peak_max_mm": 89.532646059318,
+        "peak_rms_mm": 27.227627385431294,
+        "peak_max_time_ms": 38.2006,
+        "peak_rms_time_ms": 56.0005,
+        "native_valid": true,
+        "hashes": {
+          "starter_sha256": "2f551703eb99fe05b76ea82ee141cf386aa36d086deba2c0b91211dcfe6c7a38",
+          "engine_sha256": "11f4cb68582f2964d70c8e9ba516434a978d5d5e0e61959931da92539fb9feee",
+          "native_fields_sha256": "594c72b3c108ef4e1776353c94a863fd78d5dca4630e0396c975382c5b59eac8"
+        }
+      },
+      "bead1_200": {
+        "peak_max_mm": 103.96124984400235,
+        "peak_rms_mm": 28.70770295528922,
+        "peak_max_time_ms": 42.6006,
+        "peak_rms_time_ms": 53.4006,
+        "native_valid": true,
+        "hashes": {
+          "starter_sha256": "6097d9338d1a5b809528dc813501364ffcefdcf147ff9d4406b2145ec78f56d7",
+          "engine_sha256": "11f4cb68582f2964d70c8e9ba516434a978d5d5e0e61959931da92539fb9feee",
+          "native_fields_sha256": "cc5a7b17ac4bb3d061907919db331a452ccc83b826c0077c27de911aa8c6e395"
+        }
+      },
+      "six_200": {
+        "peak_max_mm": 79.11040845758386,
+        "peak_rms_mm": 23.103039289510946,
+        "peak_max_time_ms": 32.6004,
+        "peak_rms_time_ms": 39.400400000000005,
+        "native_valid": true,
+        "hashes": {
+          "starter_sha256": "69172b73cd0f2a5d182bdcdb59ddabcdd3c514b92aa2d2b11a423260edbd615f",
+          "engine_sha256": "11f4cb68582f2964d70c8e9ba516434a978d5d5e0e61959931da92539fb9feee",
+          "native_fields_sha256": "bd397355b31dec88272b227e7d47845c4cac6acae2fb0244473e064fcd1da884"
+        }
+      }
+    }
+  }
+}
